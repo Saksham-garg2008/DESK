@@ -1,0 +1,107 @@
+{
+  "backends": {
+    "ollama": {
+      "label": "Ollama (Local)",
+      "type": "local",
+      "base_url": "http://localhost:11434",
+      "models": [
+        {"id": "llama3.2:3b", "label": "Llama 3.2 3B", "free": true, "notes": "Fast, lightweight"},
+        {"id": "llama3.2:8b", "label": "Llama 3.2 8B", "free": true, "notes": "Balanced"},
+        {"id": "llama3.1:8b", "label": "Llama 3.1 8B", "free": true, "notes": "Solid reasoning"},
+        {"id": "llama3.1:70b", "label": "Llama 3.1 70B", "free": true, "notes": "Requires high RAM"},
+        {"id": "qwen2.5:3b", "label": "Qwen 2.5 3B", "free": true, "notes": "Great for coding"},
+        {"id": "qwen2.5:7b", "label": "Qwen 2.5 7B", "free": true, "notes": "Strong coder"},
+        {"id": "qwen2.5:14b", "label": "Qwen 2.5 14B", "free": true, "notes": "Powerful coder"},
+        {"id": "qwen2.5-coder:7b", "label": "Qwen 2.5 Coder 7B", "free": true, "notes": "Code specialist"},
+        {"id": "mistral:7b", "label": "Mistral 7B", "free": true, "notes": "Fast & capable"},
+        {"id": "gemma3:4b", "label": "Gemma 3 4B", "free": true, "notes": "Google model"},
+        {"id": "gemma3:12b", "label": "Gemma 3 12B", "free": true, "notes": "Strong Google model"},
+        {"id": "phi4:14b", "label": "Phi-4 14B", "free": true, "notes": "Microsoft reasoning"},
+        {"id": "deepseek-r1:7b", "label": "DeepSeek R1 7B", "free": true, "notes": "Strong reasoning"},
+        {"id": "deepseek-r1:14b", "label": "DeepSeek R1 14B", "free": true, "notes": "Deep reasoning"},
+        {"id": "custom", "label": "Custom Model...", "free": true, "notes": "Enter model name manually"}
+      ]
+    },
+    "openai": {
+      "label": "OpenAI",
+      "type": "cloud",
+      "requires_key": "openai",
+      "models": [
+        {"id": "gpt-4.1", "label": "GPT-4.1", "free": false, "notes": "Latest flagship"},
+        {"id": "gpt-4.1-mini", "label": "GPT-4.1 Mini", "free": false, "notes": "Fast & cheap"},
+        {"id": "gpt-4.1-nano", "label": "GPT-4.1 Nano", "free": false, "notes": "Fastest, cheapest"},
+        {"id": "gpt-4o", "label": "GPT-4o", "free": false, "notes": "Multimodal"},
+        {"id": "gpt-4o-mini", "label": "GPT-4o Mini", "free": false, "notes": "Budget option"},
+        {"id": "o3", "label": "o3", "free": false, "notes": "Deep reasoning"},
+        {"id": "o4-mini", "label": "o4 Mini", "free": false, "notes": "Fast reasoning"},
+        {"id": "custom", "label": "Custom Model...", "free": false, "notes": "Enter model name manually"}
+      ]
+    },
+    "anthropic": {
+      "label": "Anthropic",
+      "type": "cloud",
+      "requires_key": "anthropic",
+      "models": [
+        {"id": "claude-opus-4-5", "label": "Claude Opus 4.5", "free": false, "notes": "Most powerful"},
+        {"id": "claude-sonnet-4-5", "label": "Claude Sonnet 4.5", "free": false, "notes": "Balanced"},
+        {"id": "claude-haiku-4-5", "label": "Claude Haiku 4.5", "free": false, "notes": "Fast & cheap"},
+        {"id": "custom", "label": "Custom Model...", "free": false, "notes": "Enter model name manually"}
+      ]
+    },
+    "gemini": {
+      "label": "Google Gemini",
+      "type": "cloud",
+      "requires_key": "gemini",
+      "models": [
+        {"id": "gemini-2.5-pro", "label": "Gemini 2.5 Pro", "free": false, "notes": "Most capable"},
+        {"id": "gemini-2.5-flash", "label": "Gemini 2.5 Flash (FREE)", "free": true, "notes": "Fast, generous free tier"},
+        {"id": "gemini-2.5-flash-lite", "label": "Gemini 2.5 Flash Lite (FREE)", "free": true, "notes": "Lightweight, free"},
+        {"id": "gemini-2.0-flash", "label": "Gemini 2.0 Flash (FREE)", "free": true, "notes": "Previous gen, free"},
+        {"id": "gemini-1.5-pro", "label": "Gemini 1.5 Pro", "free": false, "notes": "Long context"},
+        {"id": "gemini-1.5-flash", "label": "Gemini 1.5 Flash (FREE)", "free": true, "notes": "Free tier available"},
+        {"id": "custom", "label": "Custom Model...", "free": false, "notes": "Enter model name manually"}
+      ]
+    },
+    "mistral": {
+      "label": "Mistral AI",
+      "type": "cloud",
+      "requires_key": "mistral",
+      "models": [
+        {"id": "mistral-large-latest", "label": "Mistral Large", "free": false, "notes": "Flagship"},
+        {"id": "mistral-small-latest", "label": "Mistral Small", "free": false, "notes": "Efficient"},
+        {"id": "codestral-latest", "label": "Codestral", "free": false, "notes": "Code specialist"},
+        {"id": "open-mistral-nemo", "label": "Mistral Nemo (FREE)", "free": true, "notes": "Open, free tier"},
+        {"id": "custom", "label": "Custom Model...", "free": false, "notes": "Enter model name manually"}
+      ]
+    },
+    "groq": {
+      "label": "Groq (Ultra-Fast)",
+      "type": "cloud",
+      "requires_key": "groq",
+      "models": [
+        {"id": "llama-3.3-70b-versatile", "label": "Llama 3.3 70B (FREE)", "free": true, "notes": "Fast, free tier"},
+        {"id": "llama-3.1-8b-instant", "label": "Llama 3.1 8B Instant (FREE)", "free": true, "notes": "Blazing fast"},
+        {"id": "gemma2-9b-it", "label": "Gemma 2 9B (FREE)", "free": true, "notes": "Google via Groq"},
+        {"id": "deepseek-r1-distill-llama-70b", "label": "DeepSeek R1 70B (FREE)", "free": true, "notes": "Reasoning, free tier"},
+        {"id": "mixtral-8x7b-32768", "label": "Mixtral 8x7B (FREE)", "free": true, "notes": "MoE model"},
+        {"id": "qwen-qwq-32b", "label": "Qwen QwQ 32B (FREE)", "free": true, "notes": "Reasoning model"},
+        {"id": "custom", "label": "Custom Model...", "free": false, "notes": "Enter model name manually"}
+      ]
+    },
+    "openrouter": {
+      "label": "OpenRouter",
+      "type": "cloud",
+      "requires_key": "openrouter",
+      "models": [
+        {"id": "meta-llama/llama-3.3-70b-instruct:free", "label": "Llama 3.3 70B (FREE)", "free": true, "notes": "Free via OpenRouter"},
+        {"id": "google/gemma-3-27b-it:free", "label": "Gemma 3 27B (FREE)", "free": true, "notes": "Free via OpenRouter"},
+        {"id": "deepseek/deepseek-r1:free", "label": "DeepSeek R1 (FREE)", "free": true, "notes": "Free reasoning model"},
+        {"id": "mistralai/mistral-7b-instruct:free", "label": "Mistral 7B (FREE)", "free": true, "notes": "Free via OpenRouter"},
+        {"id": "qwen/qwen3-30b-a3b:free", "label": "Qwen3 30B (FREE)", "free": true, "notes": "Free via OpenRouter"},
+        {"id": "openai/gpt-4o", "label": "GPT-4o", "free": false, "notes": "Via OpenRouter"},
+        {"id": "anthropic/claude-sonnet-4-5", "label": "Claude Sonnet 4.5", "free": false, "notes": "Via OpenRouter"},
+        {"id": "custom", "label": "Custom Model...", "free": false, "notes": "Enter model name manually"}
+      ]
+    }
+  }
+}

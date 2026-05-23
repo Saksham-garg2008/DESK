@@ -1,0 +1,447 @@
+/* ═══════════════════════════════════════════════════════════════
+   DESK — Theme v2
+   Raised-pill buttons · Smooth curves · Linear/Notion dark mood
+   No boxy feeling. Everything breathes.
+═══════════════════════════════════════════════════════════════ */
+
+* {
+    font-family: "SF Pro Display", "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 13px;
+    color: #E0E0E6;
+    outline: none;
+    border: none;
+}
+
+QMainWindow, QWidget#root {
+    background-color: #18181B;
+}
+
+QWidget {
+    background-color: transparent;
+}
+
+/* ── Sidebar / The Pole ───────────────────────────────────────── */
+QWidget#sidebar {
+    background-color: #111114;
+    border-right: 1px solid #222228;
+    min-width: 52px;
+    max-width: 52px;
+}
+
+/* ── Top Bar ─────────────────────────────────────────────────── */
+QWidget#topbar {
+    background-color: #18181B;
+    border-bottom: 1px solid #222228;
+    min-height: 44px;
+    max-height: 44px;
+}
+
+/* ── Topbar text buttons (Clear, etc) ───────────────────────── */
+QPushButton#topbar_btn {
+    background-color: transparent;
+    border: none;
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 12px;
+    color: #505058;
+    font-weight: 500;
+}
+QPushButton#topbar_btn:hover {
+    background-color: #222228;
+    color: #A0A0AA;
+}
+QPushButton#topbar_btn:pressed {
+    background-color: #1A1A20;
+}
+
+/* ── NEW AGENT button — raised pill ─────────────────────────── */
+QPushButton#new_agent_btn {
+    background: qlineargradient(
+        x1:0, y1:0, x2:0, y2:1,
+        stop:0 #38383F,
+        stop:1 #28282E
+    );
+    border: 1px solid #444450;
+    border-bottom: 2px solid #141418;
+    border-radius: 8px;
+    padding: 6px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #D8D8E0;
+    letter-spacing: 0.2px;
+}
+QPushButton#new_agent_btn:hover {
+    background: qlineargradient(
+        x1:0, y1:0, x2:0, y2:1,
+        stop:0 #424249,
+        stop:1 #32323A
+    );
+    border-color: #555562;
+    color: #EDEDF5;
+}
+QPushButton#new_agent_btn:pressed {
+    background: qlineargradient(
+        x1:0, y1:0, x2:0, y2:1,
+        stop:0 #222228,
+        stop:1 #2A2A30
+    );
+    border-bottom: 1px solid #141418;
+    padding-top: 7px;
+    padding-bottom: 5px;
+}
+
+/* ── SEND button — raised pill, primary action ───────────────── */
+QPushButton#send_btn {
+    background: qlineargradient(
+        x1:0, y1:0, x2:0, y2:1,
+        stop:0 #4A4A5A,
+        stop:1 #36363E
+    );
+    border: 1px solid #5A5A6A;
+    border-bottom: 3px solid #1A1A22;
+    border-radius: 10px;
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #DCDCEE;
+    letter-spacing: 0.3px;
+}
+QPushButton#send_btn:hover {
+    background: qlineargradient(
+        x1:0, y1:0, x2:0, y2:1,
+        stop:0 #565668,
+        stop:1 #404050
+    );
+    border-color: #6A6A7A;
+    color: #EDEDFF;
+}
+QPushButton#send_btn:pressed {
+    background: qlineargradient(
+        x1:0, y1:0, x2:0, y2:1,
+        stop:0 #30303A,
+        stop:1 #3A3A44
+    );
+    border-bottom: 1px solid #1A1A22;
+    padding-top: 9px;
+    padding-bottom: 7px;
+}
+QPushButton#send_btn:disabled {
+    background: #222228;
+    border: 1px solid #2A2A30;
+    color: #404048;
+}
+
+/* ── Welcome new agent button ────────────────────────────────── */
+QPushButton#welcome_new_btn {
+    background: qlineargradient(
+        x1:0, y1:0, x2:0, y2:1,
+        stop:0 #282830,
+        stop:1 #1E1E26
+    );
+    border: 1px solid #383844;
+    border-bottom: 3px solid #0E0E14;
+    border-radius: 12px;
+    padding: 14px 36px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #686878;
+    letter-spacing: 0.3px;
+}
+QPushButton#welcome_new_btn:hover {
+    background: qlineargradient(
+        x1:0, y1:0, x2:0, y2:1,
+        stop:0 #32323C,
+        stop:1 #262630
+    );
+    border-color: #50506A;
+    color: #9898B8;
+}
+QPushButton#welcome_new_btn:pressed {
+    background: #1A1A22;
+    border-bottom: 1px solid #0E0E14;
+    padding-top: 15px;
+    padding-bottom: 13px;
+}
+
+/* ── Dialog primary button ───────────────────────────────────── */
+QPushButton#dialog_primary {
+    background: qlineargradient(
+        x1:0, y1:0, x2:0, y2:1,
+        stop:0 #44445A,
+        stop:1 #30303E
+    );
+    border: 1px solid #55556A;
+    border-bottom: 3px solid #16161E;
+    border-radius: 10px;
+    padding: 9px 24px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #D8D8F0;
+}
+QPushButton#dialog_primary:hover {
+    background: qlineargradient(
+        x1:0, y1:0, x2:0, y2:1,
+        stop:0 #505068,
+        stop:1 #3A3A4A
+    );
+    color: #EDEDFF;
+}
+QPushButton#dialog_primary:pressed {
+    background: #28282E;
+    border-bottom: 1px solid #16161E;
+    padding-top: 10px;
+    padding-bottom: 8px;
+}
+
+/* ── Dialog secondary button ─────────────────────────────────── */
+QPushButton#dialog_secondary {
+    background: transparent;
+    border: 1px solid #2E2E38;
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-size: 12px;
+    color: #505058;
+    font-weight: 500;
+}
+QPushButton#dialog_secondary:hover {
+    background: #222228;
+    border-color: #3A3A44;
+    color: #909098;
+}
+QPushButton#dialog_secondary:pressed {
+    background: #1A1A20;
+}
+
+/* ── Compute mode buttons ────────────────────────────────────── */
+QPushButton#compute_high {
+    background: qlineargradient(
+        x1:0, y1:0, x2:0, y2:1,
+        stop:0 #263A2A,
+        stop:1 #1C2E20
+    );
+    border: 1px solid #3A5A3E;
+    border-bottom: 2px solid #0E1C10;
+    border-radius: 8px;
+    padding: 7px 18px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #6ABF7A;
+}
+QPushButton#compute_high:pressed {
+    background: #1A2A1E;
+    border-bottom: 1px solid #0E1C10;
+}
+
+QPushButton#compute_low {
+    background: transparent;
+    border: 1px solid #2A2A30;
+    border-radius: 8px;
+    padding: 7px 18px;
+    font-size: 12px;
+    color: #484850;
+    font-weight: 500;
+}
+QPushButton#compute_low:hover {
+    background: #202026;
+    color: #686870;
+}
+
+/* ── Key save button ─────────────────────────────────────────── */
+QPushButton#key_save_btn {
+    background: qlineargradient(
+        x1:0, y1:0, x2:0, y2:1,
+        stop:0 #282838,
+        stop:1 #1E1E2C
+    );
+    border: 1px solid #38384A;
+    border-bottom: 2px solid #0E0E18;
+    border-radius: 7px;
+    padding: 5px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #7878A8;
+}
+QPushButton#key_save_btn:hover {
+    background: qlineargradient(
+        x1:0, y1:0, x2:0, y2:1,
+        stop:0 #323244,
+        stop:1 #262636
+    );
+    color: #9898C8;
+}
+QPushButton#key_save_btn:pressed {
+    background: #1A1A28;
+    border-bottom: 1px solid #0E0E18;
+}
+
+/* ── Inputs ──────────────────────────────────────────────────── */
+QLineEdit {
+    background-color: #1E1E24;
+    border: 1px solid #2E2E38;
+    border-radius: 9px;
+    padding: 9px 13px;
+    color: #E0E0E8;
+    font-size: 13px;
+    selection-background-color: #3A3A5A;
+}
+QLineEdit:focus {
+    border-color: #484860;
+    background-color: #222230;
+}
+QLineEdit:hover {
+    border-color: #383844;
+}
+
+QTextEdit {
+    background-color: #1E1E24;
+    border: 1px solid #2E2E38;
+    border-radius: 9px;
+    padding: 10px 13px;
+    color: #E0E0E8;
+    font-size: 13px;
+    selection-background-color: #3A3A5A;
+}
+QTextEdit:focus {
+    border-color: #484860;
+    background-color: #222230;
+}
+
+QTextEdit#chat_input {
+    background-color: #1E1E26;
+    border: 1px solid #2C2C38;
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #D8D8E4;
+}
+QTextEdit#chat_input:focus {
+    border-color: #464660;
+    background-color: #20202C;
+}
+
+/* ── ComboBox ────────────────────────────────────────────────── */
+QComboBox {
+    background: qlineargradient(
+        x1:0, y1:0, x2:0, y2:1,
+        stop:0 #222228,
+        stop:1 #1C1C22
+    );
+    border: 1px solid #303038;
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: #C8C8D4;
+    font-size: 12px;
+    min-width: 140px;
+}
+QComboBox:focus, QComboBox:hover {
+    border-color: #424250;
+}
+QComboBox::drop-down {
+    border: none;
+    width: 22px;
+}
+QComboBox QAbstractItemView {
+    background-color: #222228;
+    border: 1px solid #323240;
+    border-radius: 8px;
+    selection-background-color: #303050;
+    color: #D0D0E0;
+    padding: 4px;
+    outline: none;
+}
+
+/* ── Dialog ──────────────────────────────────────────────────── */
+QDialog {
+    background-color: #18181B;
+    border: 1px solid #272730;
+    border-radius: 14px;
+}
+QLabel#dialog_title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #E8E8F0;
+    letter-spacing: -0.4px;
+}
+QLabel#dialog_label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #404050;
+    letter-spacing: 1px;
+}
+
+/* ── Panels ──────────────────────────────────────────────────── */
+QWidget#panel {
+    background-color: #18181B;
+}
+QLabel#panel_title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #E8E8F2;
+    letter-spacing: -0.5px;
+}
+QLabel#section_label {
+    font-size: 10px;
+    color: #404050;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+}
+QFrame#divider {
+    background-color: #222228;
+    max-height: 1px;
+    min-height: 1px;
+}
+
+/* ── Welcome screen ──────────────────────────────────────────── */
+QWidget#welcome {
+    background-color: #18181B;
+}
+
+/* ── Chat area ───────────────────────────────────────────────── */
+QWidget#center {
+    background-color: #18181B;
+}
+QScrollArea#chat_scroll {
+    background: transparent;
+    border: none;
+}
+QWidget#chat_messages {
+    background: transparent;
+}
+QWidget#input_area {
+    background-color: #18181B;
+    border-top: 1px solid #222228;
+}
+
+/* ── Scrollbars (barely visible, elegant) ────────────────────── */
+QScrollBar:vertical {
+    background: transparent;
+    width: 5px;
+    margin: 0;
+}
+QScrollBar::handle:vertical {
+    background: #2E2E38;
+    border-radius: 2px;
+    min-height: 24px;
+}
+QScrollBar::handle:vertical:hover {
+    background: #404050;
+}
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical { height: 0; }
+QScrollBar:horizontal { height: 0; }
+
+/* ── Color swatches ──────────────────────────────────────────── */
+QPushButton#color_swatch {
+    border-radius: 11px;
+    min-width: 22px;
+    max-width: 22px;
+    min-height: 22px;
+    max-height: 22px;
+}
+
+/* ── Key row cards ───────────────────────────────────────────── */
+QWidget#key_row {
+    background-color: #1E1E24;
+    border-radius: 10px;
+    border: 1px solid #272730;
+}
