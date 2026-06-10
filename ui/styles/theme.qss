@@ -445,3 +445,99 @@ QWidget#key_row {
     border-radius: 10px;
     border: 1px solid #272730;
 }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   DESK — Theme v2 additions
+   Workspace Panel · Code Inspector · Workspace Button
+═══════════════════════════════════════════════════════════════ */
+
+/* ── Workspace Panel ─────────────────────────────────────────── */
+QWidget#workspace_panel {
+    background-color: #18181B;
+    border-left: 1px solid #222228;
+}
+
+QWidget#workspace_header {
+    background-color: #18181B;
+    border-bottom: 1px solid #1E1E22;
+}
+
+/* ── Workspace toggle button ─────────────────────────────────── */
+QPushButton#workspace_btn {
+    background: transparent;
+    border: 1px solid #252530;
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #404050;
+    letter-spacing: 0.3px;
+}
+QPushButton#workspace_btn:hover {
+    background: #1E1E28;
+    border-color: #353548;
+    color: #606078;
+}
+QPushButton#workspace_btn:checked {
+    background: #1E1E2C;
+    border: 1px solid #3A3A50;
+    color: #7878AA;
+}
+
+/* ── Code Inspector Panel ────────────────────────────────────── */
+QWidget#code_inspector {
+    background-color: #12121A;
+    border-left: 1px solid #1E1E28;
+}
+
+QWidget#inspector_header {
+    background-color: #16161E;
+    border-bottom: 1px solid #1E1E28;
+}
+
+QWidget#inspector_controls {
+    background-color: #14141C;
+    border-bottom: 1px solid #1C1C26;
+}
+
+QWidget#inspector_footer {
+    background-color: #12121A;
+    border-top: 1px solid #1A1A24;
+}
+
+QScrollArea#inspector_scroll {
+    background: #12121A;
+    border: none;
+}
+
+/* ── Inspector action buttons ────────────────────────────────── */
+QPushButton#inspector_btn {
+    background: qlineargradient(
+        x1:0, y1:0, x2:0, y2:1,
+        stop:0 #1E1E2C,
+        stop:1 #181820
+    );
+    border: 1px solid #2A2A3A;
+    border-bottom: 2px solid #0E0E16;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #5A5A7A;
+}
+QPushButton#inspector_btn:hover {
+    background: qlineargradient(
+        x1:0, y1:0, x2:0, y2:1,
+        stop:0 #242434,
+        stop:1 #1C1C28
+    );
+    color: #8080A8;
+    border-color: #363650;
+}
+QPushButton#inspector_btn:pressed {
+    background: #14141E;
+    border-bottom: 1px solid #0E0E16;
+    padding-top: 5px;
+    padding-bottom: 3px;
+}

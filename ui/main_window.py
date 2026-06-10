@@ -1,10 +1,10 @@
 """
-DESK — Main Window
-Fixes:
-- Refresh NEVER deletes history or config. It only reloads UI.
-- Colors preserved on refresh (config not wiped).
-- Right-click agent strip → Edit or Fire context menu.
-- Fire button in topbar (fires the currently active agent).
+DESK — Main Window V2
+Adds:
+- Workspace button in topbar → modal panel (right side)
+- Code inspector panel (right-side splitter, hidden by default)
+- Workspace panel refresh on artifact changes
+- Fire/Clear also clear artifacts
 """
 import sys
 import os
@@ -12,7 +12,8 @@ from pathlib import Path
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
     QLabel, QPushButton, QStackedWidget, QSizePolicy,
-    QScrollArea, QFrame, QApplication, QMenu, QDialog
+    QScrollArea, QFrame, QApplication, QMenu, QDialog,
+    QSplitter
 )
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut, QFont, QColor, QPainter, QPen
@@ -23,7 +24,10 @@ from ui.dialogs.edit_agent_dialog import EditAgentDialog
 from ui.panels.chat_panel import ChatPanel, ConfirmDialog
 from ui.panels.settings_panel import SettingsPanel
 from ui.panels.keys_panel import KeysPanel
+from ui.panels.workspace_panel import WorkspacePanel
+from ui.panels.code_inspector_panel import CodeInspectorPanel
 from core.history_manager import delete_agent_history
+from core.artifact_manager import ArtifactManager
 from core.config_loader import (
     get_agent_config, load_agents_config, delete_agent_config,
     get_app_setting, set_app_setting
@@ -33,8 +37,6 @@ BUCKET_DIR = Path(__file__).parent.parent / "bucket"
 
 
 class AgentStrip(QPushButton):
-    """A single horizontal colored strip on The Pole."""
-
     def __init__(self, name: str, color: str, parent=None):
         super().__init__(parent)
         self.agent_name = name
@@ -155,6 +157,7 @@ class MainWindow(QMainWindow):
         self._agent_strips: dict[str, AgentStrip] = {}
         self._agent_panels: dict[str, ChatPanel] = {}
         self._active_agent: str | None = None
+        self._workspace_visible = False
 
         self._build_ui()
         self._load_stylesheet()
@@ -219,6 +222,12 @@ class MainWindow(QMainWindow):
 
         self._build_topbar(right_layout)
 
+        # ── Content area: chat + workspace panel (side by side) ───────
+        self.content_splitter = QHBoxLayout()
+        self.content_splitter.setContentsMargins(0, 0, 0, 0)
+        self.content_splitter.setSpacing(0)
+
+        # Stack (chat panels, welcome, settings, keys)
         self.stack = QStackedWidget()
         self.stack.setObjectName("center")
 
@@ -232,8 +241,43 @@ class MainWindow(QMainWindow):
         self.keys_panel = KeysPanel()
         self.stack.addWidget(self.keys_panel)
 
-        right_layout.addWidget(self.stack, 1)
+        self.content_splitter.addWidget(self.stack, 1)
+
+        # ── Workspace panel (modal, right side) ───────────────────────
+        # Vertical divider
+        self.ws_divider = QFrame()
+        self.ws_divider.setFrameShape(QFrame.VLine)
+        self.ws_divider.setStyleSheet("background: #222228; max-width: 1px;")
+        self.ws_divider.setVisible(False)
+        self.content_splitter.addWidget(self.ws_divider)
+
+        self.workspace_panel = WorkspacePanel()
+        self.workspace_panel.setFixedWidth(300)
+        self.workspace_panel.setVisible(False)
+        self.workspace_panel.artifact_open_requested.connect(self._open_artifact)
+        self.content_splitter.addWidget(self.workspace_panel)
+
+        content_widget = QWidget()
+        content_widget.setLayout(self.content_splitter)
+        right_layout.addWidget(content_widget, 1)
+
+        # ── Code Inspector (right-side overlay when viewing code) ─────
+        # We build it as a splitter on the main window level
+        self.code_inspector = CodeInspectorPanel()
+        self.code_inspector.setVisible(False)
+        self.code_inspector.closed.connect(self._on_inspector_closed)
+
         main_layout.addWidget(right, 1)
+        # Inspector is overlaid using a horizontal layout on root
+        main_layout.addWidget(self.code_inspector)
+
+        # Divider for inspector
+        self.inspector_divider = QFrame()
+        self.inspector_divider.setFrameShape(QFrame.VLine)
+        self.inspector_divider.setStyleSheet("background: #1A1A22; max-width: 1px;")
+        self.inspector_divider.setVisible(False)
+        # Insert before inspector
+        main_layout.insertWidget(main_layout.count() - 1, self.inspector_divider)
 
     def _build_pole_icons(self):
         new_btn = self._pole_icon_btn("＋", "New Agent (Ctrl+N)", self._open_new_agent_dialog)
@@ -311,10 +355,17 @@ class MainWindow(QMainWindow):
         self.compute_pill.clicked.connect(self._toggle_compute_mode)
         layout.addWidget(self.compute_pill)
 
+        # ── Workspace button ─────────────────────────────────────────
+        self.workspace_btn = QPushButton("Workspace")
+        self.workspace_btn.setObjectName("workspace_btn")
+        self.workspace_btn.setCheckable(True)
+        self.workspace_btn.clicked.connect(self._toggle_workspace)
+        layout.addWidget(self.workspace_btn)
+
         # ── Fire Agent button ────────────────────────────────────────
         self.fire_btn = QPushButton("🔥 Fire Agent")
         self.fire_btn.setToolTip("Fire (delete) the currently active agent")
-        self.fire_btn.setVisible(False)  # Hidden until an agent is active
+        self.fire_btn.setVisible(False)
         self.fire_btn.setStyleSheet("""
             QPushButton {
                 background: qlineargradient(
@@ -339,12 +390,6 @@ class MainWindow(QMainWindow):
                 color: #E07070;
                 border-color: #7A3A3E;
             }
-            QPushButton:pressed {
-                background: #22101 2;
-                border-bottom: 1px solid #180A0C;
-                padding-top: 6px;
-                padding-bottom: 4px;
-            }
         """)
         self.fire_btn.clicked.connect(self._fire_active_agent)
         layout.addWidget(self.fire_btn)
@@ -357,13 +402,55 @@ class MainWindow(QMainWindow):
 
         parent_layout.addWidget(topbar)
 
+    # ── Workspace Panel ────────────────────────────────────────────────────
+
+    def _toggle_workspace(self):
+        self._workspace_visible = not self._workspace_visible
+        self.workspace_panel.setVisible(self._workspace_visible)
+        self.ws_divider.setVisible(self._workspace_visible)
+        self.workspace_btn.setChecked(self._workspace_visible)
+
+        if self._workspace_visible:
+            self.workspace_btn.setStyleSheet("""
+                QPushButton {
+                    background: #1E1E2C;
+                    border: 1px solid #3A3A50;
+                    border-radius: 6px;
+                    padding: 4px 12px;
+                    font-size: 11px;
+                    font-weight: 600;
+                    color: #7878AA;
+                    letter-spacing: 0.3px;
+                }
+            """)
+            self.workspace_panel.refresh()
+        else:
+            self.workspace_btn.setStyleSheet("")
+
+    def _open_artifact(self, agent_name: str, filename: str):
+        """Open code inspector for a specific artifact."""
+        self.code_inspector.load_artifact(agent_name, filename)
+        self.inspector_divider.setVisible(True)
+        self.code_inspector.setVisible(True)
+        # Set a reasonable default width
+        if self.code_inspector.width() < 300:
+            self.code_inspector.setFixedWidth(400)
+
+    def _on_inspector_closed(self):
+        self.inspector_divider.setVisible(False)
+
+    def _on_artifact_changed(self, agent_name: str):
+        """Chat panel signals that artifacts changed."""
+        if self._workspace_visible:
+            self.workspace_panel.refresh_agent(agent_name)
+        # Refresh inspector if it's showing an artifact from this agent
+        if (self.code_inspector.isVisible() and
+                self.code_inspector._agent_name == agent_name):
+            self.code_inspector.refresh_current()
+
     # ── Agent Management ───────────────────────────────────────────────────
 
     def _load_existing_agents(self):
-        """
-        Load agents from bucket/ — reads config for color.
-        NEVER deletes anything.
-        """
         agents_cfg = load_agents_config().get("agents", {})
         for md_file in sorted(BUCKET_DIR.glob("*.md"), key=lambda p: p.stem):
             agent_name = md_file.stem
@@ -391,6 +478,9 @@ class MainWindow(QMainWindow):
         self._agent_strips[name] = strip
 
         panel = ChatPanel(name, color)
+        # Wire signals
+        panel.artifacts_changed.connect(self._on_artifact_changed)
+        panel.artifact_open_requested.connect(self._open_artifact)
         self.stack.addWidget(panel)
         self._agent_panels[name] = panel
 
@@ -408,11 +498,7 @@ class MainWindow(QMainWindow):
         self.fire_btn.setVisible(True)
 
     def _hard_remove_agent(self, name: str):
-        """
-        Permanently remove agent: UI + config + bucket file + history.
-        Called only from Fire actions.
-        """
-        # Remove UI
+        """Permanently remove agent: UI + config + bucket + history + artifacts."""
         if name in self._agent_strips:
             strip = self._agent_strips.pop(name)
             self.strips_layout.removeWidget(strip)
@@ -423,14 +509,21 @@ class MainWindow(QMainWindow):
             self.stack.removeWidget(panel)
             panel.deleteLater()
 
-        # Remove data
         md_path = BUCKET_DIR / f"{name}.md"
         if md_path.exists():
             md_path.unlink()
         delete_agent_config(name)
         delete_agent_history(name)
 
-        # Navigate away
+        # Delete artifacts
+        am = ArtifactManager()
+        am.delete_agent_artifacts(name)
+
+        # Hide inspector if showing this agent's artifacts
+        if self.code_inspector.isVisible() and self.code_inspector._agent_name == name:
+            self.code_inspector.hide()
+            self.inspector_divider.setVisible(False)
+
         if self._active_agent == name:
             self._active_agent = None
             self.fire_btn.setVisible(False)
@@ -440,11 +533,10 @@ class MainWindow(QMainWindow):
                 self.stack.setCurrentWidget(self.welcome)
                 self.topbar_title.setText("DESK")
 
+        if self._workspace_visible:
+            self.workspace_panel.remove_agent(name)
+
     def _soft_remove_agent(self, name: str):
-        """
-        Remove agent from UI only — used by refresh.
-        Does NOT delete config, history, or bucket files.
-        """
         if name in self._agent_strips:
             strip = self._agent_strips.pop(name)
             self.strips_layout.removeWidget(strip)
@@ -461,10 +553,19 @@ class MainWindow(QMainWindow):
         if not self._active_agent:
             return
         name = self._active_agent
+        am = ArtifactManager()
+        art_count = am.artifact_count(name)
+        art_note = ""
+        if art_count > 0:
+            art_note = (
+                f" This will also permanently delete {art_count} workspace "
+                f"artifact{'s' if art_count != 1 else ''}."
+            )
+
         dlg = ConfirmDialog(
             f"Fire {name}?",
-            f"This will permanently delete {name} and all their chat history. "
-            "The agent's .md file will be removed from bucket/. This cannot be undone.",
+            f"This will permanently delete {name} and all their chat history."
+            f"{art_note} This cannot be undone.",
             parent=self
         )
         dlg.setStyleSheet(self.styleSheet())
@@ -507,7 +608,6 @@ class MainWindow(QMainWindow):
         edit_action = menu.addAction(f"✏️  Edit {name}")
         menu.addSeparator()
         fire_action = menu.addAction(f"🔥  Fire {name}")
-        fire_action.setData("fire")
 
         chosen = menu.exec(strip.mapToGlobal(pos))
         if chosen == edit_action:
@@ -516,10 +616,18 @@ class MainWindow(QMainWindow):
             self._confirm_fire_agent(name)
 
     def _confirm_fire_agent(self, name: str):
+        am = ArtifactManager()
+        art_count = am.artifact_count(name)
+        art_note = ""
+        if art_count > 0:
+            art_note = (
+                f" This will also permanently delete {art_count} workspace "
+                f"artifact{'s' if art_count != 1 else ''}."
+            )
         dlg = ConfirmDialog(
             f"Fire {name}?",
-            f"This will permanently delete {name} and all their chat history. "
-            "The agent's .md file will be removed from bucket/. This cannot be undone.",
+            f"This will permanently delete {name} and all their chat history."
+            f"{art_note} This cannot be undone.",
             parent=self
         )
         dlg.setStyleSheet(self.styleSheet())
@@ -536,38 +644,27 @@ class MainWindow(QMainWindow):
         dlg.exec()
 
     def _on_agent_updated(self, old_name: str, new_name: str, color: str):
-        """
-        Handle agent edit result.
-        If name changed: rebuild UI entry under new name.
-        If only color/config changed: update strip color in place.
-        """
         if old_name != new_name:
-            # Name changed — soft remove old, add new
             was_active = (self._active_agent == old_name)
             self._soft_remove_agent(old_name)
             self._add_agent_to_pole(new_name, color)
             if was_active:
                 self._activate_agent(new_name)
         else:
-            # Just update color in existing strip and panel
             if old_name in self._agent_strips:
                 self._agent_strips[old_name].update_color(color)
             if old_name in self._agent_panels:
                 self._agent_panels[old_name].agent_color = color
 
+        if self._workspace_visible:
+            self.workspace_panel.refresh()
         self.settings_panel.refresh()
 
     # ── Refresh ────────────────────────────────────────────────────────────
 
     def _refresh_app(self):
-        """
-        Soft reload: tear down UI widgets, rebuild from disk.
-        NEVER deletes history, config, or bucket files.
-        Config and history are read fresh from disk after reload.
-        """
         previously_active = self._active_agent
 
-        # Soft-remove all agents (UI only — no data deleted)
         for name in list(self._agent_strips.keys()):
             self._soft_remove_agent(name)
 
@@ -575,16 +672,18 @@ class MainWindow(QMainWindow):
         self.fire_btn.setVisible(False)
         self.topbar_title.setText("DESK")
 
-        # Reload stylesheet
         self._load_stylesheet()
-
-        # Rebuild from disk
         self._load_existing_agents()
         self.settings_panel.refresh()
 
-        # Restore previously active agent if it still exists
         if previously_active and previously_active in self._agent_strips:
             self._activate_agent(previously_active)
+
+        if self._workspace_visible:
+            self.workspace_panel.refresh()
+
+        # Reload artifact manager from disk
+        ArtifactManager().reload()
 
     # ── Panels ─────────────────────────────────────────────────────────────
 
@@ -598,6 +697,8 @@ class MainWindow(QMainWindow):
         self._add_agent_to_pole(name, color)
         self._activate_agent(name)
         self.settings_panel.refresh()
+        if self._workspace_visible:
+            self.workspace_panel.refresh()
 
     def _show_settings(self):
         self.settings_panel.refresh()
@@ -640,9 +741,10 @@ class MainWindow(QMainWindow):
         color = cfg.get("color", "#5B7FA6")
         self._add_agent_to_pole(name, color)
         self.settings_panel.refresh()
+        if self._workspace_visible:
+            self.workspace_panel.refresh()
 
     def _on_agent_fired(self, name: str):
-        # File deleted externally (from file manager, not DESK UI)
         self._hard_remove_agent(name)
         self.settings_panel.refresh()
 
@@ -657,6 +759,9 @@ class MainWindow(QMainWindow):
         )
         QShortcut(QKeySequence("Ctrl+,"), self).activated.connect(
             self._show_settings
+        )
+        QShortcut(QKeySequence("Ctrl+W"), self).activated.connect(
+            self._toggle_workspace
         )
 
     def _cycle_agents(self):

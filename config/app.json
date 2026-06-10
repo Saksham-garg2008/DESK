@@ -1,12 +1,11 @@
 {
-  "version": "1.0.0",
-  "compute_mode": "high",
+  "version": "2.0.0",
+  "compute_mode": "low",
   "theme": "medium_grey",
-  "response_length": "standard",
+  "response_length": "concise",
   "last_active_agent": null,
   "window": {
-    "width": 1200,
-    "height": 800,
-    "sidebar_width": 52
+    "width": 1366,
+    "height": 705
   }
 }
