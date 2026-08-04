@@ -53,13 +53,12 @@
       "type": "cloud",
       "requires_key": "gemini",
       "models": [
-        {"id": "gemini-2.5-pro", "label": "Gemini 2.5 Pro", "free": false, "notes": "Most capable"},
-        {"id": "gemini-2.5-flash", "label": "Gemini 2.5 Flash (FREE)", "free": true, "notes": "Fast, generous free tier"},
-        {"id": "gemini-2.5-flash-lite", "label": "Gemini 2.5 Flash Lite (FREE)", "free": true, "notes": "Lightweight, free"},
-        {"id": "gemini-2.0-flash", "label": "Gemini 2.0 Flash (FREE)", "free": true, "notes": "Previous gen, free"},
-        {"id": "gemini-1.5-pro", "label": "Gemini 1.5 Pro", "free": false, "notes": "Long context"},
-        {"id": "gemini-1.5-flash", "label": "Gemini 1.5 Flash (FREE)", "free": true, "notes": "Free tier available"},
-        {"id": "custom", "label": "Custom Model...", "free": false, "notes": "Enter model name manually"}
+        {"id": "gemini-3.5-flash", "label": "Gemini 3.5 Flash", "free": false, "notes": "Latest, most capable Flash"},
+        {"id": "gemini-3.1-flash-lite", "label": "Gemini 3.1 Flash Lite (FREE)", "free": true, "notes": "Newest lite tier, generous free quota"},
+        {"id": "gemini-2.5-flash", "label": "Gemini 2.5 Flash (FREE)", "free": true, "notes": "Still active — shuts down Oct 16, 2026"},
+        {"id": "gemini-2.5-flash-lite", "label": "Gemini 2.5 Flash Lite (FREE)", "free": true, "notes": "Still active — shuts down Oct 16, 2026"},
+        {"id": "gemini-2.5-pro", "label": "Gemini 2.5 Pro", "free": false, "notes": "Still active, most capable current-gen"},
+        {"id": "custom", "label": "Custom Model...", "free": false, "notes": "Enter model name manually — check ai.google.dev/gemini-api/docs/models for current IDs"}
       ]
     },
     "mistral": {
@@ -79,13 +78,13 @@
       "type": "cloud",
       "requires_key": "groq",
       "models": [
-        {"id": "llama-3.3-70b-versatile", "label": "Llama 3.3 70B (FREE)", "free": true, "notes": "Fast, free tier"},
-        {"id": "llama-3.1-8b-instant", "label": "Llama 3.1 8B Instant (FREE)", "free": true, "notes": "Blazing fast"},
-        {"id": "gemma2-9b-it", "label": "Gemma 2 9B (FREE)", "free": true, "notes": "Google via Groq"},
+        {"id": "openai/gpt-oss-120b", "label": "GPT-OSS 120B (FREE)", "free": true, "notes": "Flagship open-weight, replaces old Llama 3.3 70B"},
+        {"id": "openai/gpt-oss-20b", "label": "GPT-OSS 20B (FREE)", "free": true, "notes": "Fast, replaces old Llama 3.1 8B Instant"},
+        {"id": "meta-llama/llama-4-scout", "label": "Llama 4 Scout (FREE)", "free": true, "notes": "Meta's latest, day-zero on Groq"},
+        {"id": "meta-llama/llama-4-maverick", "label": "Llama 4 Maverick (FREE)", "free": true, "notes": "Meta's latest, larger variant"},
+        {"id": "qwen/qwen3.6-27b", "label": "Qwen 3.6 27B (FREE)", "free": true, "notes": "Reasoning, replaces old QwQ 32B"},
         {"id": "deepseek-r1-distill-llama-70b", "label": "DeepSeek R1 70B (FREE)", "free": true, "notes": "Reasoning, free tier"},
-        {"id": "mixtral-8x7b-32768", "label": "Mixtral 8x7B (FREE)", "free": true, "notes": "MoE model"},
-        {"id": "qwen-qwq-32b", "label": "Qwen QwQ 32B (FREE)", "free": true, "notes": "Reasoning model"},
-        {"id": "custom", "label": "Custom Model...", "free": false, "notes": "Enter model name manually"}
+        {"id": "custom", "label": "Custom Model...", "free": false, "notes": "Enter model name manually — check console.groq.com/docs/models for current IDs"}
       ]
     },
     "openrouter": {
@@ -93,7 +92,7 @@
       "type": "cloud",
       "requires_key": "openrouter",
       "models": [
-        {"id": "meta-llama/llama-3.3-70b-instruct:free", "label": "Llama 3.3 70B (FREE)", "free": true, "notes": "Free via OpenRouter"},
+        {"id": "meta-llama/llama-4-scout:free", "label": "Llama 4 Scout (FREE)", "free": true, "notes": "Free via OpenRouter"},
         {"id": "google/gemma-3-27b-it:free", "label": "Gemma 3 27B (FREE)", "free": true, "notes": "Free via OpenRouter"},
         {"id": "deepseek/deepseek-r1:free", "label": "DeepSeek R1 (FREE)", "free": true, "notes": "Free reasoning model"},
         {"id": "mistralai/mistral-7b-instruct:free", "label": "Mistral 7B (FREE)", "free": true, "notes": "Free via OpenRouter"},

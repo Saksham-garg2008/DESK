@@ -1,5 +1,5 @@
 """
-Settings Panel — Compute mode, response length, per-agent model config.
+Settings Panel — Compute mode, response length, Memory Agent, per-agent model config.
 """
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
@@ -11,7 +11,8 @@ from PySide6.QtCore import Qt, Signal
 from core.config_loader import (
     get_app_setting, set_app_setting,
     load_agents_config, set_agent_config,
-    load_models_config
+    load_models_config,
+    get_memory_agent_config, set_memory_agent_config
 )
 from core.compute_manager import ComputeManager
 
@@ -113,6 +114,72 @@ class SettingsPanel(QWidget):
 
         layout.addWidget(self._divider())
 
+        # ── Memory Agent ────────────────────────────────────────────
+        layout.addWidget(self._section("MEMORY AGENT"))
+
+        memory_desc = QLabel(
+            "A single lightweight model used to distill and update every agent's "
+            "memory in the background after conversations. Keep this small — it's "
+            "janitorial work, not a personality. Falls back to each agent's own "
+            "model if left unconfigured."
+        )
+        memory_desc.setStyleSheet("color: #5A5A5E; font-size: 12px; line-height: 1.5;")
+        memory_desc.setWordWrap(True)
+        layout.addWidget(memory_desc)
+
+        mem_row = QHBoxLayout()
+        mem_row.setSpacing(10)
+
+        mem_cfg = get_memory_agent_config()
+
+        self.memory_backend_combo = QComboBox()
+        backends = list(self.models_config.get("backends", {}).keys())
+        for b in backends:
+            label = self.models_config["backends"][b]["label"]
+            self.memory_backend_combo.addItem(label, b)
+
+        current_mem_backend = mem_cfg.get("backend", "ollama")
+        idx = backends.index(current_mem_backend) if current_mem_backend in backends else 0
+        self.memory_backend_combo.setCurrentIndex(idx)
+
+        self.memory_model_combo = QComboBox()
+        self._populate_models(self.memory_model_combo, current_mem_backend, mem_cfg.get("model", ""))
+
+        self.memory_backend_combo.currentIndexChanged.connect(
+            lambda i: self._populate_models(
+                self.memory_model_combo, self.memory_backend_combo.currentData(), ""
+            )
+        )
+
+        memory_save_btn = QPushButton("Save")
+        memory_save_btn.setObjectName("key_save_btn")
+        memory_save_btn.clicked.connect(self._save_memory_agent)
+
+        mem_row.addWidget(QLabel("Backend:"))
+        mem_row.addWidget(self.memory_backend_combo, 1)
+        mem_row.addWidget(QLabel("Model:"))
+        mem_row.addWidget(self.memory_model_combo, 2)
+        mem_row.addWidget(memory_save_btn)
+        layout.addLayout(mem_row)
+
+        self.memory_custom_input = QLineEdit()
+        self.memory_custom_input.setPlaceholderText("Enter model name...")
+        self.memory_custom_input.setVisible(self.memory_model_combo.currentData() == "custom")
+        layout.addWidget(self.memory_custom_input)
+
+        self.memory_model_combo.currentIndexChanged.connect(
+            lambda i: self.memory_custom_input.setVisible(
+                self.memory_model_combo.currentData() == "custom"
+            )
+        )
+
+        self.memory_saved_label = QLabel()
+        self.memory_saved_label.setStyleSheet("color: #6ABF7A; font-size: 11px;")
+        self.memory_saved_label.setVisible(False)
+        layout.addWidget(self.memory_saved_label)
+
+        layout.addWidget(self._divider())
+
         # ── Per-Agent Config ───────────────────────────────────────
         layout.addWidget(self._section("AGENT CONFIGURATION"))
 
@@ -124,6 +191,19 @@ class SettingsPanel(QWidget):
         layout.addStretch()
         scroll.setWidget(content)
         outer.addWidget(scroll)
+
+    # ── Memory Agent ─────────────────────────────────────────────────
+
+    def _save_memory_agent(self):
+        backend = self.memory_backend_combo.currentData()
+        model = self.memory_model_combo.currentData()
+        if model == "custom" and self.memory_custom_input.text().strip():
+            model = self.memory_custom_input.text().strip()
+        set_memory_agent_config(backend, model)
+        self.memory_saved_label.setText(f"✓ Saved — memory updates now use {model}")
+        self.memory_saved_label.setVisible(True)
+
+    # ── Per-agent config ─────────────────────────────────────────────
 
     def _populate_agents(self):
         # Clear existing
@@ -192,11 +272,17 @@ class SettingsPanel(QWidget):
             lambda i, mc=model_combo, bc=backend_combo: self._on_backend_change(bc, mc)
         )
 
+        # Declared here (before save_btn) so the save closure can capture it —
+        # actual widget is built and added to layout just below.
+        custom_model_input = QLineEdit()
+        custom_model_input.setPlaceholderText("Enter model name...")
+        custom_model_input.setVisible(model_combo.currentData() == "custom")
+
         save_btn = QPushButton("Save")
         save_btn.setObjectName("key_save_btn")
         save_btn.clicked.connect(
-            lambda checked, n=name, bc=backend_combo, mc=model_combo, c=cfg:
-            self._save_agent_config(n, bc, mc, c)
+            lambda checked, n=name, bc=backend_combo, mc=model_combo, c=cfg, ci=custom_model_input:
+            self._save_agent_config(n, bc, mc, c, ci)
         )
 
         dropdowns_row.addWidget(QLabel("Backend:"))
@@ -206,14 +292,13 @@ class SettingsPanel(QWidget):
         dropdowns_row.addWidget(save_btn)
         layout.addLayout(dropdowns_row)
 
-        # Custom model input (shown only when "custom" is selected)
-        self.custom_model_input = QLineEdit()
-        self.custom_model_input.setPlaceholderText("Enter model name...")
-        self.custom_model_input.setVisible(False)
-        layout.addWidget(self.custom_model_input)
+        # Custom model input (shown only when "custom" is selected) — local
+        # to this row, NOT a shared self. attribute, so each agent card
+        # keeps its own independent custom-model field.
+        layout.addWidget(custom_model_input)
 
         model_combo.currentIndexChanged.connect(
-            lambda i, mc=model_combo: self.custom_model_input.setVisible(
+            lambda i, mc=model_combo, ci=custom_model_input: ci.setVisible(
                 mc.currentData() == "custom"
             )
         )
@@ -236,11 +321,12 @@ class SettingsPanel(QWidget):
         self._populate_models(model_combo, backend, "")
 
     def _save_agent_config(self, name: str, backend_combo: QComboBox,
-                           model_combo: QComboBox, existing_cfg: dict):
+                           model_combo: QComboBox, existing_cfg: dict,
+                           custom_input: QLineEdit):
         backend = backend_combo.currentData()
         model = model_combo.currentData()
-        if model == "custom" and self.custom_model_input.text().strip():
-            model = self.custom_model_input.text().strip()
+        if model == "custom" and custom_input.text().strip():
+            model = custom_input.text().strip()
 
         updated = {**existing_cfg, "backend": backend, "model": model}
         set_agent_config(name, updated)

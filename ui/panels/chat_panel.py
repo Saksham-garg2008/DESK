@@ -27,6 +27,11 @@ from core.compute_manager import ComputeManager, InferenceWorker
 from core.config_loader import get_agent_config, get_app_setting
 from core.history_manager import load_history, save_history, clear_history
 from core.artifact_manager import ArtifactManager
+from core.config_loader import get_memory_agent_config
+from core.memory_manager import (
+    load_memory, save_memory, build_distillation_prompt,
+    clean_distillation_output, DISTILL_EVERY_N_EXCHANGES,
+)
 
 BUCKET_DIR = Path(__file__).parent.parent.parent / "bucket"
 SUPPORTED_IMAGES = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
@@ -696,6 +701,10 @@ class ChatPanel(QWidget):
         self._attachment_chips:   list[AttachmentChip] = []
         self._current_response_widget: MessageWidget | None = None
         self._active_worker = None
+        # ── Memory distillation state ───────────────────────────────
+        self._exchanges_since_distill = 0
+        self._memory_worker = None
+        self._memory_buffer = ""
         self._build_ui()
         self._load_history()
 
@@ -925,6 +934,16 @@ class ChatPanel(QWidget):
         if md_path.exists():
             system_prompt = md_path.read_text(encoding="utf-8")
 
+        # ── Inject long-term memory, if any exists yet ──────────────
+        agent_memory = load_memory(self.agent_name)
+        if agent_memory:
+            system_prompt = (
+                f"{system_prompt}\n\n"
+                f"--- What you remember from past conversations ---\n"
+                f"{agent_memory}\n"
+                f"--- end memory ---"
+            ).strip()
+
         inference = InferenceManager()
         worker    = InferenceWorker(
             inference.chat, backend, model, system_prompt,
@@ -971,11 +990,116 @@ class ChatPanel(QWidget):
         self._active_worker = None
         self._save_history()
 
+        # ── Memory distillation trigger ─────────────────────────────
+        self._exchanges_since_distill += 1
+        if self._exchanges_since_distill >= DISTILL_EVERY_N_EXCHANGES:
+            self._trigger_memory_distillation()
+            self._exchanges_since_distill = 0
+
     def _on_error(self, err: str):
         self.send_btn.setEnabled(True)
         if self._current_response_widget:
             self._current_response_widget.append_text(f"\n[Error: {err}]")
         self._active_worker = None
+
+    # ── Memory Distillation ──────────────────────────────────────────────
+
+    def _trigger_memory_distillation(self):
+        """
+        Fires a separate, non-blocking background call that reads recent
+        exchanges + existing memory, and produces an updated memory file.
+        Uses the global Memory Agent config; falls back to this agent's
+        own backend/model if the Memory Agent has never been configured.
+
+        Isolated from the main chat worker entirely — a slow or failing
+        memory model must never block or affect the chat itself.
+        """
+        if self._memory_worker is not None:
+            return  # already running, don't overlap
+
+        recent = self._recent_plain_exchanges(limit=8)
+        if not recent:
+            return
+
+        existing_memory = load_memory(self.agent_name)
+        system_prompt, user_prompt = build_distillation_prompt(
+            self.agent_name, existing_memory, recent
+        )
+
+        mem_cfg = get_memory_agent_config()
+        backend = mem_cfg.get("backend") or ""
+        model = mem_cfg.get("model") or ""
+        if not backend or not model:
+            # Fall back to this agent's own backend/model
+            agent_cfg = get_agent_config(self.agent_name)
+            backend = agent_cfg.get("backend", "ollama")
+            model = agent_cfg.get("model", "llama3.2:3b")
+
+        inference = InferenceManager()
+        worker = InferenceWorker(
+            inference.chat, backend, model, system_prompt,
+            [{"role": "user", "content": user_prompt}],
+            "standard",
+        )
+        self._memory_worker = worker
+        self._memory_buffer = ""
+        worker.signals.chunk.connect(self._on_memory_chunk)
+        worker.signals.finished.connect(self._on_memory_done)
+        worker.signals.error.connect(self._on_memory_error)
+        ComputeManager().run(worker)
+
+    def _on_memory_chunk(self, chunk: str):
+        self._memory_buffer += chunk
+
+    def _on_memory_done(self):
+        try:
+            cleaned = clean_distillation_output(self._memory_buffer, self.agent_name)
+            save_memory(self.agent_name, cleaned)
+        except Exception:
+            # Silent failure — chat is never affected by a bad memory update
+            pass
+        finally:
+            self._memory_worker = None
+            self._memory_buffer = ""
+
+    def _on_memory_error(self, err: str):
+        # Silent failure — memory just doesn't update this round
+        self._memory_worker = None
+        self._memory_buffer = ""
+
+    def flush_memory(self):
+        """
+        Force a memory distillation pass right now, regardless of the
+        exchange counter. Call this on agent-switch-away or app close so
+        short-but-important conversations aren't lost.
+        """
+        if self._exchanges_since_distill > 0:
+            self._trigger_memory_distillation()
+            self._exchanges_since_distill = 0
+
+    def _recent_plain_exchanges(self, limit: int = 8) -> list[dict]:
+        """
+        Returns the last `limit` messages as plain role/content dicts,
+        text-only — attachments are flattened to their text parts (or
+        skipped if they had none), since the memory model only needs
+        the conversational substance, not raw file/image payloads.
+        """
+        out = []
+        for msg in self.messages[-limit:]:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if isinstance(content, str):
+                if content.strip():
+                    out.append({"role": role, "content": content})
+            else:
+                text_parts = [
+                    p.get("text", "") for p in content
+                    if isinstance(p, dict) and p.get("type") == "text"
+                ]
+                text = " ".join(text_parts).strip()
+                if text:
+                    out.append({"role": role, "content": text})
+        return out
 
     # ── History ───────────────────────────────────────────────────────────
 
@@ -1075,6 +1199,7 @@ class ChatPanel(QWidget):
     def _clear_chat(self):
         self.messages.clear()
         clear_history(self.agent_name)
+        self._exchanges_since_distill = 0
 
         # Clear artifacts too
         am = ArtifactManager()

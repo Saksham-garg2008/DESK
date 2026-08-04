@@ -6,18 +6,9 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent.parent
 CONFIG_DIR = BASE_DIR / "config"
 
-# Default app.json content — used when file is missing or corrupt
-_DEFAULT_APP_CONFIG = {
-    "version": "2.0.0",
-    "compute_mode": "high",
-    "theme": "medium_grey",
-    "response_length": "standard",
-    "last_active_agent": None,
-    "window": {
-        "width": 1200,
-        "height": 800,
-        "sidebar_width": 52
-    }
+DEFAULT_MEMORY_AGENT = {
+    "backend": "",
+    "model": "",
 }
 
 
@@ -25,29 +16,18 @@ def _load(filename: str) -> dict:
     path = CONFIG_DIR / filename
     if not path.exists():
         return {}
-    try:
-        content = path.read_text(encoding="utf-8").strip()
-        if not content:
-            return {}
-        return json.loads(content)
-    except (json.JSONDecodeError, Exception):
-        return {}
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 def _save(filename: str, data: dict) -> None:
-    CONFIG_DIR.mkdir(exist_ok=True)
     path = CONFIG_DIR / filename
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
 
 def load_app_config() -> dict:
-    data = _load("app.json")
-    if not data:
-        # File was missing or corrupt — restore defaults and save
-        _save("app.json", _DEFAULT_APP_CONFIG)
-        return dict(_DEFAULT_APP_CONFIG)
-    return data
+    return _load("app.json")
 
 
 def save_app_config(data: dict) -> None:
@@ -55,10 +35,7 @@ def save_app_config(data: dict) -> None:
 
 
 def load_agents_config() -> dict:
-    data = _load("agents.json")
-    if not data:
-        return {"agents": {}}
-    return data
+    return _load("agents.json")
 
 
 def save_agents_config(data: dict) -> None:
@@ -66,10 +43,7 @@ def save_agents_config(data: dict) -> None:
 
 
 def load_keys_config() -> dict:
-    data = _load("keys.json")
-    if not data:
-        return {"keys": {}}
-    return data
+    return _load("keys.json")
 
 
 def save_keys_config(data: dict) -> None:
@@ -122,3 +96,33 @@ def set_app_setting(key: str, value) -> None:
     config = load_app_config()
     config[key] = value
     save_app_config(config)
+
+
+# ── Memory Agent (global) ────────────────────────────────────────────────
+#
+# The Memory Agent is a single, globally-configured backend+model used to
+# distill every agent's memory file after conversations. It is intentionally
+# NOT per-agent — it's infrastructure, not personality. Think of it as the
+# intern taking meeting notes: lightweight, background, non-blocking.
+#
+# If never configured, callers should fall back to the active chat agent's
+# own backend/model (see chat_panel.py).
+
+def get_memory_agent_config() -> dict:
+    """
+    Returns {"backend": str, "model": str}.
+    Empty strings mean "not configured" — caller should fall back.
+    """
+    config = load_app_config()
+    return config.get("memory_agent", dict(DEFAULT_MEMORY_AGENT))
+
+
+def set_memory_agent_config(backend: str, model: str) -> None:
+    config = load_app_config()
+    config["memory_agent"] = {"backend": backend, "model": model}
+    save_app_config(config)
+
+
+def is_memory_agent_configured() -> bool:
+    cfg = get_memory_agent_config()
+    return bool(cfg.get("backend")) and bool(cfg.get("model"))

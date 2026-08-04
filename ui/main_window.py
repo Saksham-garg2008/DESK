@@ -26,8 +26,10 @@ from ui.panels.settings_panel import SettingsPanel
 from ui.panels.keys_panel import KeysPanel
 from ui.panels.workspace_panel import WorkspacePanel
 from ui.panels.code_inspector_panel import CodeInspectorPanel
+from ui.panels.memory_panel import MemoryPanel
 from core.history_manager import delete_agent_history
 from core.artifact_manager import ArtifactManager
+from core.memory_manager import delete_agent_memory, rename_memory
 from core.config_loader import (
     get_agent_config, load_agents_config, delete_agent_config,
     get_app_setting, set_app_setting
@@ -241,6 +243,9 @@ class MainWindow(QMainWindow):
         self.keys_panel = KeysPanel()
         self.stack.addWidget(self.keys_panel)
 
+        self.memory_panel = MemoryPanel()
+        self.stack.addWidget(self.memory_panel)
+
         self.content_splitter.addWidget(self.stack, 1)
 
         # ── Workspace panel (modal, right side) ───────────────────────
@@ -293,6 +298,7 @@ class MainWindow(QMainWindow):
         div2.setStyleSheet("background-color: #222228;")
         self.pole_bottom.addWidget(div2)
 
+        self.pole_bottom.addWidget(self._pole_icon_btn("🧠", "Memory", self._show_memory_panel))
         self.pole_bottom.addWidget(self._pole_icon_btn("⚙", "Settings", self._show_settings))
         self.pole_bottom.addWidget(self._pole_icon_btn("🔑", "API Keys", self._show_keys))
         self.pole_bottom.addWidget(self._pole_icon_btn("↺", "Refresh", self._refresh_app))
@@ -488,6 +494,11 @@ class MainWindow(QMainWindow):
         if name not in self._agent_panels:
             return
 
+        # Flush any pending memory update for the agent we're leaving,
+        # before switching away.
+        if self._active_agent and self._active_agent in self._agent_panels:
+            self._agent_panels[self._active_agent].flush_memory()
+
         if self._active_agent and self._active_agent in self._agent_strips:
             self._agent_strips[self._active_agent].set_active(False)
 
@@ -514,6 +525,7 @@ class MainWindow(QMainWindow):
             md_path.unlink()
         delete_agent_config(name)
         delete_agent_history(name)
+        delete_agent_memory(name)
 
         # Delete artifacts
         am = ArtifactManager()
@@ -572,6 +584,7 @@ class MainWindow(QMainWindow):
         if dlg.exec() == QDialog.Accepted:
             self._hard_remove_agent(name)
             self.settings_panel.refresh()
+            self.memory_panel.refresh()
 
     # ── Right-click Context Menu ───────────────────────────────────────────
 
@@ -634,6 +647,7 @@ class MainWindow(QMainWindow):
         if dlg.exec() == QDialog.Accepted:
             self._hard_remove_agent(name)
             self.settings_panel.refresh()
+            self.memory_panel.refresh()
 
     # ── Edit Agent ─────────────────────────────────────────────────────────
 
@@ -645,6 +659,9 @@ class MainWindow(QMainWindow):
 
     def _on_agent_updated(self, old_name: str, new_name: str, color: str):
         if old_name != new_name:
+            # Migrate memory file to follow the rename, same as history.
+            rename_memory(old_name, new_name)
+
             was_active = (self._active_agent == old_name)
             self._soft_remove_agent(old_name)
             self._add_agent_to_pole(new_name, color)
@@ -659,6 +676,7 @@ class MainWindow(QMainWindow):
         if self._workspace_visible:
             self.workspace_panel.refresh()
         self.settings_panel.refresh()
+        self.memory_panel.refresh()
 
     # ── Refresh ────────────────────────────────────────────────────────────
 
@@ -675,6 +693,7 @@ class MainWindow(QMainWindow):
         self._load_stylesheet()
         self._load_existing_agents()
         self.settings_panel.refresh()
+        self.memory_panel.refresh()
 
         if previously_active and previously_active in self._agent_strips:
             self._activate_agent(previously_active)
@@ -697,10 +716,13 @@ class MainWindow(QMainWindow):
         self._add_agent_to_pole(name, color)
         self._activate_agent(name)
         self.settings_panel.refresh()
+        self.memory_panel.refresh()
         if self._workspace_visible:
             self.workspace_panel.refresh()
 
     def _show_settings(self):
+        if self._active_agent and self._active_agent in self._agent_panels:
+            self._agent_panels[self._active_agent].flush_memory()
         self.settings_panel.refresh()
         self.stack.setCurrentWidget(self.settings_panel)
         if self._active_agent and self._active_agent in self._agent_strips:
@@ -710,12 +732,32 @@ class MainWindow(QMainWindow):
         self.topbar_title.setText("SETTINGS")
 
     def _show_keys(self):
+        if self._active_agent and self._active_agent in self._agent_panels:
+            self._agent_panels[self._active_agent].flush_memory()
         self.stack.setCurrentWidget(self.keys_panel)
         if self._active_agent and self._active_agent in self._agent_strips:
             self._agent_strips[self._active_agent].set_active(False)
         self._active_agent = None
         self.fire_btn.setVisible(False)
         self.topbar_title.setText("API KEYS")
+
+    def _show_memory_panel(self):
+        """
+        Opens the full Memory panel — global Memory Agent picker at the
+        top, agent list + editable memory content below. Reached directly
+        via the 🧠 pole icon, same pattern as Settings/Keys.
+        """
+        if self._active_agent and self._active_agent in self._agent_panels:
+            self._agent_panels[self._active_agent].flush_memory()
+        self.memory_panel.refresh()
+        self.stack.setCurrentWidget(self.memory_panel)
+        if self._active_agent and self._active_agent in self._agent_strips:
+            self._agent_strips[self._active_agent].set_active(False)
+        self._active_agent = None
+        self.fire_btn.setVisible(False)
+        self.topbar_title.setText("MEMORY")
+
+    # ── Memory Agent config lives inside the Memory panel itself now ──────
 
     # ── Compute Mode ───────────────────────────────────────────────────────
 
@@ -741,12 +783,14 @@ class MainWindow(QMainWindow):
         color = cfg.get("color", "#5B7FA6")
         self._add_agent_to_pole(name, color)
         self.settings_panel.refresh()
+        self.memory_panel.refresh()
         if self._workspace_visible:
             self.workspace_panel.refresh()
 
     def _on_agent_fired(self, name: str):
         self._hard_remove_agent(name)
         self.settings_panel.refresh()
+        self.memory_panel.refresh()
 
     # ── Shortcuts ──────────────────────────────────────────────────────────
 
@@ -787,6 +831,11 @@ class MainWindow(QMainWindow):
         self.resize(w, h)
 
     def closeEvent(self, event):
+        # Flush any agent with unsaved memory progress before quitting.
+        # Best-effort/non-blocking — never delays shutdown.
+        for panel in self._agent_panels.values():
+            panel.flush_memory()
+
         set_app_setting("window", {
             "width": self.width(),
             "height": self.height(),

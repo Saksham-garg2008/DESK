@@ -7,5 +7,9 @@
   "window": {
     "width": 1366,
     "height": 705
+  },
+  "memory_agent": {
+    "backend": "gemini",
+    "model": "gemini-2.5-flash-lite"
   }
 }
