@@ -34,6 +34,8 @@ from core.memory_manager import (
 )
 
 from core.paths import BUCKET_DIR, IMAGES_DIR
+from core.agent_protocol import extract_action
+from core.agent_actions import execute_action
 
 SUPPORTED_IMAGES = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 SUPPORTED_DOCS   = {".pdf", ".txt", ".md", ".csv", ".json", ".py",
@@ -935,6 +937,20 @@ class ChatPanel(QWidget):
         if md_path.exists():
             system_prompt = md_path.read_text(encoding="utf-8")
 
+        system_prompt = (
+            f"{system_prompt}\n\n"
+            "--- DESK AGENTIC CAPABILITIES ---\n"
+            "You are connected to DESK and may request local actions.\n"
+            "When the user asks you to open a website, request the action "
+            "using exactly this format:\n\n"
+            "<DESK_ACTION>\n"
+            '{"action": "open_url", "url": "https://example.com"}\n'
+            "</DESK_ACTION>\n\n"
+            "Do not claim that an action was completed yourself. "
+            "DESK will execute the action and report the result.\n"
+            "--- END DESK AGENTIC CAPABILITIES ---"
+        ).strip()
+
         # ── Inject long-term memory, if any exists yet ──────────────
         agent_memory = load_memory(self.agent_name)
         if agent_memory:
@@ -968,6 +984,27 @@ class ChatPanel(QWidget):
         self.send_btn.setEnabled(True)
         if self._current_response_widget:
             raw = self._current_response_widget.get_raw_text()
+            action, visible_text = extract_action(raw)
+
+            if action:
+                try:
+                    result = execute_action(action)
+    
+                    # Replace the internal action request with a clean user-facing result.
+                    if action.get("action") == "open_url":
+                        visible_text = f"Opened {result}"
+
+                except Exception as e:
+                    visible_text = f"Could not complete the action: {e}"
+
+                # Update what the user sees.
+                self._current_response_widget._raw_text = visible_text
+                self._current_response_widget.label.setText(
+                    markdown_to_html(visible_text)
+                )
+
+                # Store only the human-readable result in history.
+                raw = visible_text
             self.messages.append({"role": "assistant", "content": raw})
 
             # ── Parse artifacts from response ──────────────────────────
