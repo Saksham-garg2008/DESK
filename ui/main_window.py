@@ -8,7 +8,7 @@ Adds:
 """
 import sys
 import os
-from pathlib import Path
+
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
     QLabel, QPushButton, QStackedWidget, QSizePolicy,
@@ -35,7 +35,7 @@ from core.config_loader import (
     get_app_setting, set_app_setting
 )
 
-BUCKET_DIR = Path(__file__).parent.parent / "bucket"
+from core.paths import BUCKET_DIR, RESOURCE_STYLES_DIR
 
 
 class AgentStrip(QPushButton):
@@ -821,7 +821,7 @@ class MainWindow(QMainWindow):
     # ── Stylesheet & Geometry ──────────────────────────────────────────────
 
     def _load_stylesheet(self):
-        qss_path = Path(__file__).parent / "styles" / "theme.qss"
+        qss_path = RESOURCE_STYLES_DIR / "theme.qss"
         if qss_path.exists():
             self.setStyleSheet(qss_path.read_text(encoding="utf-8"))
 

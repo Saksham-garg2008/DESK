@@ -6,7 +6,7 @@ from pathlib import Path
 from PySide6.QtCore import QFileSystemWatcher, QObject, Signal
 
 
-BUCKET_DIR = Path(__file__).parent.parent / "bucket"
+from core.paths import BUCKET_DIR
 
 
 class FileWatcher(QObject):

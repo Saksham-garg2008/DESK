@@ -39,7 +39,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional
 
-CONFIG_DIR = Path(__file__).parent.parent / "config"
+from core.paths import CONFIG_DIR, atomic_write_text
 ARTIFACTS_FILE = CONFIG_DIR / "artifacts.json"
 
 MAX_VERSIONS = 3
@@ -128,9 +128,13 @@ class ArtifactManager:
 
     def _save(self):
         CONFIG_DIR.mkdir(exist_ok=True)
-        ARTIFACTS_FILE.write_text(
-            json.dumps(self._data, indent=2, ensure_ascii=False),
-            encoding="utf-8"
+        atomic_write_text(
+            ARTIFACTS_FILE,
+            json.dumps(
+                self._data,
+                indent=2,
+                ensure_ascii=False,
+            ),
         )
 
     def reload(self):

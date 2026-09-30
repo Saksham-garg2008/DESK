@@ -1,10 +1,10 @@
 import json
 import os
-from pathlib import Path
-
-
-BASE_DIR = Path(__file__).parent.parent
-CONFIG_DIR = BASE_DIR / "config"
+from core.paths import (
+    CONFIG_DIR,
+    RESOURCE_CONFIG_DIR,
+    atomic_write_text,
+)
 
 DEFAULT_MEMORY_AGENT = {
     "backend": "",
@@ -14,16 +14,28 @@ DEFAULT_MEMORY_AGENT = {
 
 def _load(filename: str) -> dict:
     path = CONFIG_DIR / filename
+
     if not path.exists():
         return {}
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
 
 
 def _save(filename: str, data: dict) -> None:
     path = CONFIG_DIR / filename
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+
+    atomic_write_text(
+        path,
+        json.dumps(
+            data,
+            indent=2,
+            ensure_ascii=False,
+        ),
+    )
 
 
 def load_app_config() -> dict:
@@ -51,7 +63,20 @@ def save_keys_config(data: dict) -> None:
 
 
 def load_models_config() -> dict:
-    return _load("models.json")
+    """
+    Models are application resources, not user data.
+    They are bundled with DESK and are therefore read from RESOURCE_CONFIG_DIR.
+    """
+    path = RESOURCE_CONFIG_DIR / "models.json"
+
+    if not path.exists():
+        return {}
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
 
 
 def get_agent_config(agent_name: str) -> dict:

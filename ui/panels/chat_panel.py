@@ -33,12 +33,13 @@ from core.memory_manager import (
     clean_distillation_output, DISTILL_EVERY_N_EXCHANGES,
 )
 
-BUCKET_DIR = Path(__file__).parent.parent.parent / "bucket"
+from core.paths import BUCKET_DIR, IMAGES_DIR
+
 SUPPORTED_IMAGES = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 SUPPORTED_DOCS   = {".pdf", ".txt", ".md", ".csv", ".json", ".py",
                     ".js", ".ts", ".html", ".css", ".yaml", ".toml", ".xml"}
 
-IMAGES_DIR = Path(__file__).parent.parent.parent / "workspace" / "history" / "images"
+
 _IMG_MARKER_PREFIX = "[[DESK_IMG:"
 _IMG_MARKER_SUFFIX = "]]"
 _FILE_MARKER_PREFIX = "[[DESK_FILE:"

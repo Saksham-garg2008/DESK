@@ -23,7 +23,7 @@ from pathlib import Path
 from datetime import datetime
 import re
 
-HISTORY_DIR = Path(__file__).parent.parent / "workspace" / "history"
+from core.paths import HISTORY_DIR, atomic_write_text
 
 _MSG_START = re.compile(r"<!-- MSG role:(\w+) -->")
 _MSG_END   = "<!-- END MSG -->"
@@ -93,7 +93,10 @@ def save_history(agent_name: str, messages: list[dict]) -> None:
         lines.append(_MSG_END)
         lines.append("")
 
-    path.write_text("\n".join(lines), encoding="utf-8")
+    atomic_write_text(
+        path,
+        "\n".join(lines),
+    )
 
 
 def clear_history(agent_name: str) -> None:

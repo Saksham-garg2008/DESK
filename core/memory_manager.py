@@ -35,7 +35,7 @@ Rules:
 from pathlib import Path
 from datetime import datetime
 
-MEMORY_DIR = Path(__file__).parent.parent / "workspace" / "memory"
+from core.paths import MEMORY_DIR, atomic_write_text
 
 MEMORY_TEMPLATE = """<!-- DESK MEMORY: {agent_name} -->
 <!-- updated: {timestamp} -->
@@ -78,7 +78,10 @@ def save_memory(agent_name: str, content: str) -> None:
     Always plain — no LLM call happens in this function.
     """
     path = _agent_memory_path(agent_name)
-    path.write_text(content.strip() + "\n", encoding="utf-8")
+    atomic_write_text(
+        path,
+        content.strip() + "/n",
+    )
 
 
 def delete_agent_memory(agent_name: str) -> None:

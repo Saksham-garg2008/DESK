@@ -14,7 +14,7 @@ from PySide6.QtGui import QDragEnterEvent, QDropEvent, QColor
 
 from core.config_loader import set_agent_config, load_models_config
 
-BUCKET_DIR = Path(__file__).parent.parent.parent / "bucket"
+from core.paths import BUCKET_DIR
 
 AGENT_COLORS = [
     "#5B7FA6",  # Slate Blue

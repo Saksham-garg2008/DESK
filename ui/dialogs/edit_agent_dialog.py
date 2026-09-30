@@ -14,7 +14,7 @@ from core.config_loader import (
     delete_agent_config
 )
 
-BUCKET_DIR = Path(__file__).parent.parent.parent / "bucket"
+from core.paths import BUCKET_DIR
 
 AGENT_COLORS = [
     "#5B7FA6", "#7A6FA6", "#A67A6F", "#6FA67A",
