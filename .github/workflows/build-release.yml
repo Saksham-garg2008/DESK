@@ -1,0 +1,107 @@
+name: Build DESK Release
+
+# Runs automatically whenever you push a version tag (e.g. v2.1.0).
+# Builds a Windows .exe AND a Linux binary in parallel, then attaches
+# both to a GitHub Release page automatically. No manual OS-juggling
+# ever needed again — push a tag, come back in a few minutes, both
+# binaries are ready to download.
+
+on:
+  push:
+    tags:
+      - 'v*'          # triggers on any tag starting with "v" — v2.1.0, v2.2.0, etc.
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build Windows .exe
+        run: |
+          pyinstaller main.py --onefile --windowed --name DESK-Windows `
+            --icon DESK.ico `
+            --add-data "config;config" `
+            --add-data "bucket;bucket" `
+            --add-data "workspace;workspace" `
+            --add-data "ui/styles;ui/styles"
+
+      - name: Upload Windows build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DESK-Windows
+          path: dist/DESK-Windows.exe
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies for Qt
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxcb-cursor0 libxcb-xinerama0 libxkbcommon-x11-0
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build Linux binary
+        run: |
+          pyinstaller main.py --onefile --windowed --name DESK-Linux \
+            --add-data "config:config" \
+            --add-data "bucket:bucket" \
+            --add-data "workspace:workspace" \
+            --add-data "ui/styles:ui/styles"
+
+      - name: Upload Linux build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DESK-Linux
+          path: dist/DESK-Linux
+
+  create-release:
+    needs: [build-windows, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Windows build
+        uses: actions/download-artifact@v4
+        with:
+          name: DESK-Windows
+          path: release-files
+
+      - name: Download Linux build
+        uses: actions/download-artifact@v4
+        with:
+          name: DESK-Linux
+          path: release-files
+
+      - name: Create GitHub Release with both binaries attached
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-files/DESK-Windows.exe
+            release-files/DESK-Linux
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
