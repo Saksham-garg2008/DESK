@@ -13,7 +13,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QDragEnterEvent, QDropEvent, QColor
 
 from core.config_loader import set_agent_config, load_models_config
-
+from core.chrome_profiles import get_chrome_profiles
 from core.paths import BUCKET_DIR
 
 AGENT_COLORS = [
@@ -318,6 +318,20 @@ class NewAgentDialog(QDialog):
         # Populate initial models
         self._on_backend_change(0)
 
+        # Chrome profile
+        layout.addWidget(self._field_label("CHROME PROFILE"))
+
+        self.chrome_profile_combo = QComboBox()
+        self.chrome_profile_combo.addItem("System Default", None)
+
+        for profile in get_chrome_profiles():
+            self.chrome_profile_combo.addItem(
+                profile["name"],
+                profile["directory"],
+            )
+
+        layout.addWidget(self.chrome_profile_combo)
+
         # Free tier note
         self.free_note = QLabel("💡 Models marked (FREE) have no cost but may have rate limits.")
         self.free_note.setStyleSheet("font-size: 11px; color: #4A6A4A;")
@@ -378,12 +392,15 @@ class NewAgentDialog(QDialog):
         BUCKET_DIR.mkdir(exist_ok=True)
         md_path.write_text(self._system_prompt, encoding="utf-8")
 
+        chrome_profile = self.chrome_profile_combo.currentData()
+
         set_agent_config(self._agent_name, {
             "color": self.selected_color,
             "backend": backend,
             "model": model,
             "response_length": "standard",
             "system_prompt": self._system_prompt,
+            "chrome_profile": chrome_profile,
         })
 
         self.agent_created.emit(self._agent_name, self.selected_color)

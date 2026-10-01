@@ -927,6 +927,10 @@ class ChatPanel(QWidget):
         self._scroll_to_bottom()
 
         config = get_agent_config(self.agent_name)
+        self._chrome_profile = config.get(
+            "chrome_profile",
+            None,
+        )
         backend         = config.get("backend", "ollama")
         model           = config.get("model", "llama3.2:3b")
         response_length = config.get(
@@ -988,8 +992,11 @@ class ChatPanel(QWidget):
 
             if action:
                 try:
-                    result = execute_action(action)
-    
+                    result = execute_action(
+                        action,
+                        chrome_profile=self._chrome_profile,
+                    )
+                        
                     # Replace the internal action request with a clean user-facing result.
                     if action.get("action") == "open_url":
                         visible_text = f"Opened {result}"

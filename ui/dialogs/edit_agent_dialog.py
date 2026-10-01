@@ -15,6 +15,7 @@ from core.config_loader import (
 )
 
 from core.paths import BUCKET_DIR
+from core.chrome_profiles import get_chrome_profiles
 
 AGENT_COLORS = [
     "#5B7FA6", "#7A6FA6", "#A67A6F", "#6FA67A",
@@ -39,6 +40,10 @@ class EditAgentDialog(QDialog):
         self.selected_color = cfg.get("color", AGENT_COLORS[0])
         self._current_backend = cfg.get("backend", "ollama")
         self._current_model   = cfg.get("model", "")
+        self._current_chrome_profile = cfg.get(
+            "chrome_profile",
+            None,
+        )
 
         md_path = BUCKET_DIR / f"{agent_name}.md"
         self._current_prompt = md_path.read_text(encoding="utf-8") if md_path.exists() else ""
@@ -129,6 +134,34 @@ class EditAgentDialog(QDialog):
             )
         )
 
+
+        # ── Chrome Profile ────────────────────────────────────────────────
+
+        layout.addWidget(self._lbl("CHROME PROFILE"))
+
+        self.chrome_profile_combo = QComboBox()
+        self.chrome_profile_combo.addItem(
+            "System Default",
+            None,
+        )
+
+        profiles = get_chrome_profiles()
+
+        selected_index = 0
+
+        for i, profile in enumerate(profiles, start=1):
+            self.chrome_profile_combo.addItem(
+                profile["name"],
+                profile["directory"],
+            )
+
+            if profile["directory"] == self._current_chrome_profile:
+                selected_index = i
+
+        self.chrome_profile_combo.setCurrentIndex(selected_index)
+
+        layout.addWidget(self.chrome_profile_combo)
+
         # ── Buttons ────────────────────────────────────────────────────
         layout.addSpacing(4)
         btn_row = QHBoxLayout()
@@ -210,11 +243,15 @@ class EditAgentDialog(QDialog):
         existing = get_agent_config(self.original_name) or {}
         set_agent_config(new_name, {
             **existing,
-            "color":           self.selected_color,
-            "backend":         backend,
-            "model":           model,
-            "system_prompt":   new_prompt,
-            "response_length": existing.get("response_length", "standard"),
+            "color": self.selected_color,
+            "backend": backend,
+            "model": model,
+            "system_prompt": new_prompt,
+            "response_length": existing.get(
+                "response_length",
+                "standard",
+            ),
+            "chrome_profile": self.chrome_profile_combo.currentData(),
         })
 
         self.agent_updated.emit(self.original_name, new_name, self.selected_color)
