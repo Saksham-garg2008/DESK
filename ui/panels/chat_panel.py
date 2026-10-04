@@ -944,12 +944,25 @@ class ChatPanel(QWidget):
         system_prompt = (
             f"{system_prompt}\n\n"
             "--- DESK AGENTIC CAPABILITIES ---\n"
-            "You are connected to DESK and may request local actions.\n"
+            "You are connected to DESK and may request local actions.\n\n"
+
             "When the user asks you to open a website, request the action "
             "using exactly this format:\n\n"
             "<DESK_ACTION>\n"
             '{"action": "open_url", "url": "https://example.com"}\n'
             "</DESK_ACTION>\n\n"
+
+            "When the user asks you to open an installed application, "
+            "request the action using exactly this format:\n\n"
+            "<DESK_ACTION>\n"
+            '{"action": "open_application", "application": "Telegram"}\n'
+            "</DESK_ACTION>\n\n"
+
+            "For applications, provide only the human-readable application "
+            "name. Never provide an executable path, shell command, or "
+            "OS-specific launch instruction. DESK will find and launch "
+            "the application on the user's operating system.\n\n"
+
             "Do not claim that an action was completed yourself. "
             "DESK will execute the action and report the result.\n"
             "--- END DESK AGENTIC CAPABILITIES ---"
@@ -996,21 +1009,25 @@ class ChatPanel(QWidget):
                         action,
                         chrome_profile=self._chrome_profile,
                     )
-                        
-                    # Replace the internal action request with a clean user-facing result.
+
                     if action.get("action") == "open_url":
                         visible_text = f"Opened {result}"
 
-                except Exception as e:
-                    visible_text = f"Could not complete the action: {e}"
+                    elif action.get("action") == "open_application":
+                        visible_text = f"Opened {result}"
 
-                # Update what the user sees.
+                    else:
+                        visible_text = f"Completed action: {result}"
+
+                except Exception as e:
+                    visible_text = (
+                        f"Could not complete the action: {e}"
+                    )
+
                 self._current_response_widget._raw_text = visible_text
                 self._current_response_widget.label.setText(
                     markdown_to_html(visible_text)
                 )
-
-                # Store only the human-readable result in history.
                 raw = visible_text
             self.messages.append({"role": "assistant", "content": raw})
 

@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import webbrowser
 from urllib.parse import urlparse
+from core.applications import open_application
 
 
 ALLOWED_SCHEMES = {"http", "https"}
@@ -117,6 +118,10 @@ def execute_action(
             chrome_profile=chrome_profile,
         )
 
+    if action_name == "open_application":
+        return open_application(
+            action.get("application", ""),
+        )
     raise ValueError(
         f"Unknown agent action: {action_name}"
     )
