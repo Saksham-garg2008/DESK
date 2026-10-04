@@ -1,201 +1,337 @@
 # DESK
 
-**Your entire AI office. One desktop app.**
+> A lightweight, cross-platform AI desktop assistant built around persistent agents, local workspace tools, and controlled agentic actions.
 
-DESK is a native desktop application that lets solopreneurs run a full AI-powered office from a single interface. Create multiple AI agents, each with their own personality, purpose, and intelligence. Talk to all of them. Let them build things for you.
+DESK is a desktop AI assistant built with **Python and PySide6**. It combines conversational AI with persistent agents, memory, workspace management, and a growing set of actions that allow an agent to interact with the user's desktop.
 
-> *The entire office now sits on a desktop. Solopreneurs shake buildings.*
-
----
-
-## What DESK Does
-
-You hire agents. Each agent has a name, a role, and a brain — local or cloud. You talk to them the same way you'd talk to a team. They remember your conversations, build things for you, and keep everything organized in a Workspace.
-
-No browser tabs. No switching between ChatGPT and Claude and Gemini. One app. Everything in one place.
+DESK is designed to remain **simple, lightweight, and practical** rather than relying on large local AI frameworks.
 
 ---
 
-## Features
+## ✨ What DESK Can Do
 
-### The Agents
-- **Hire agents** — give them a name, a system prompt, a color
-- **Fire agents** — hard delete, everything gone cleanly
-- **Edit agents** — rename, reprompt, recolor, swap their brain mid-conversation
-- **Right-click** any agent strip for a context menu
+### 🤖 AI Agents
 
-### The Intelligence
-- **7 backends supported** — Ollama (local), OpenAI, Anthropic, Google Gemini, Mistral, Groq, OpenRouter
-- **Mix and match** — one agent on local Llama, another on GPT-4, another on Gemini Flash
-- **Free tier models** — Gemini 2.0 Flash, Groq Llama 3.3, OpenRouter DeepSeek R1, Mistral Nemo — all marked clearly
-- **Streaming responses** — output appears in real time
+Create multiple AI agents with their own personas and configurations.
 
-### The Workspace *(New in v2)*
-- **Artifact detection** — when an agent builds a file, DESK captures it automatically. No special commands. The agent just knows.
-- **Workspace panel** — all your agents' files in one place. Searchable. Organized by agent.
-- **Code versioning** — same filename, updated content → new version. Up to 3 versions per file.
-- **Code Inspector** — click any file, a side panel opens. Switch between versions. Copy the full file. Download it. Resizable.
-- **Clean chat** — artifact code blocks are suppressed in chat. You see the agent's explanation and a clickable file chip. The code lives in the Workspace, not the conversation.
-- **Inline snippets** — short code examples (not full files) appear inline with a one-click copy button
+Each agent can maintain its own context while sharing the same DESK environment.
 
-### The History
-- **Persistent chat** — every conversation saved automatically per agent
-- **File attachments** — drag & drop images and documents into chat
-- **Images rendered inline** — send a screenshot, the agent sees it
-- **Clear chat** — wipes history and artifacts for that agent
-
-### The Interface
-- **The Pole** — the left sidebar. One colored strip per agent. Click to switch. Shift+Tab to cycle.
-- **Compute modes** — High (parallel agents, 4 threads) or Low (serial, RAM-safe for 4GB machines)
-- **Response length** — Concise / Standard / Detailed / Full, set globally or per agent
-- **Settings panel** — all config in one place
-- **Keys panel** — API keys stored locally, never sent anywhere except the provider you configure
+- Multiple independent agents
+- Persistent agent configuration
+- Custom agent personas
+- Per-agent AI configuration
+- Agent-specific Chrome profiles
 
 ---
 
-## Supported Backends
+### 🧠 Memory & Persistence
 
-| Backend | Type | Notable Free Models |
-|---|---|---|
-| Ollama | Local | All models — free forever |
-| Google Gemini | Cloud | Gemini 2.0 Flash, 2.5 Flash Lite, 1.5 Flash |
-| Groq | Cloud | Llama 3.3 70B, DeepSeek R1, Qwen QwQ 32B |
-| OpenRouter | Cloud | Llama 3.3, Gemma 3 27B, DeepSeek R1 |
-| Mistral | Cloud | Mistral Nemo |
-| OpenAI | Cloud | All paid |
-| Anthropic | Cloud | All paid |
+DESK keeps important application data across sessions.
+
+Conversation history, memory, workspace data, and configuration are stored outside the application bundle so that user data survives application restarts and executable updates.
+
+DESK uses platform-appropriate locations for persistent data:
+
+| Platform | Data location |
+|---|---|
+| Windows | `%APPDATA%\DESK` |
+| Linux | `$XDG_DATA_HOME/DESK` or `~/.local/share/DESK` |
+| macOS | `~/Library/Application Support/DESK` |
 
 ---
 
-## Getting Started
+### 🌐 Browser Actions
 
-### Requirements
-- Windows 10/11
-- Python 3.11+ (if running from source)
-- For local models: [Ollama](https://ollama.com) installed separately
+Agents can request browser actions through DESK's structured action system.
 
-### Run from Source
+For example, an agent can request that DESK open a website without needing to know how the user's browser is installed.
 
-```bash
-# Clone the repo
-git clone https://github.com/yourusername/DESK.git
-cd DESK
+DESK can also use a configured Chrome profile for an agent.
 
-# Install dependencies
-pip install PySide6
+This means the **agent decides what it wants to open, while DESK controls which browser configuration is actually used.**
 
-# Copy the keys template
-cp config/keys.template.json config/keys.json
+---
 
-# Run
-python main.py
+### 🖥️ Application Actions
+
+DESK can open installed desktop applications using a human-readable application name.
+
+The application launcher is designed to avoid maintaining a hardcoded list of applications.
+
+Instead, DESK resolves applications using information provided by the operating system:
+
+- **Linux** — discovers applications through `.desktop` entries
+- **Windows** — searches Start Menu shortcuts
+- **macOS** — uses the operating system's application launching system
+
+The agent does not need to know executable paths, installation directories, or OS-specific launch commands.
+
+---
+
+## 🔐 Controlled Agentic Actions
+
+DESK uses a structured action protocol to separate **conversation** from **desktop actions**.
+
+An agent can request an action using a structured format:
+
+```text
+<DESK_ACTION>
+{
+  "action": "open_url",
+  "url": "https://www.youtube.com"
+}
+</DESK_ACTION>
 ```
 
-### Windows Executable
+DESK then extracts, validates, and executes the requested action.
 
-Download `DESK-v2.0.0-windows.zip` from the [Releases](../../releases) page. Unzip and run `DESK.exe`. No Python required.
+This creates an important separation:
+
+```text
+User
+  │
+  ▼
+AI Agent
+  │
+  │  decides what action is needed
+  ▼
+DESK Action Protocol
+  │
+  │  validates & interprets
+  ▼
+DESK Action Executor
+  │
+  │  controls local execution
+  ▼
+Operating System
+```
+
+The model does **not** need to know the user's local executable paths, Chrome profile directories, or other machine-specific configuration.
 
 ---
 
-## Project Structure
+## 🏗️ Architecture
 
-```
-DESK/
-├── config/              → app.json, agents.json, keys.json, models.json, artifacts.json
-├── bucket/              → agent .md files (filename = agent name, content = system prompt)
-├── workspace/
-│   └── history/         → chat history per agent + attached images
+DESK is organized into several core components.
+
+```text
+DESK
 ├── core/
-│   ├── inference_manager.py   → all LLM calls route through here
-│   ├── artifact_manager.py    → workspace artifact detection + versioning
-│   ├── compute_manager.py     → threading + compute modes
-│   ├── config_loader.py       → reads/writes all config JSON
-│   └── history_manager.py     → chat persistence
+│   ├── inference_manager.py
+│   ├── compute_manager.py
+│   ├── artifact_manager.py
+│   ├── history_manager.py
+│   ├── memory_manager.py
+│   ├── config_loader.py
+│   ├── agent_actions.py
+│   ├── agent_protocol.py
+│   ├── applications.py
+│   ├── chrome_profiles.py
+│   └── paths.py
+│
 ├── ui/
 │   ├── main_window.py
-│   ├── panels/
-│   │   ├── chat_panel.py
-│   │   ├── workspace_panel.py
-│   │   ├── code_inspector_panel.py
-│   │   ├── settings_panel.py
-│   │   └── keys_panel.py
-│   ├── dialogs/
-│   │   ├── add_agent_dialog.py
-│   │   └── edit_agent_dialog.py
-│   └── styles/
-│       └── theme.qss
-├── utils/
-│   └── file_watcher.py
+│   └── chat_panel.py
+│
+├── config/
+│
+├── bucket/
+│
+├── workspace/
+│
 └── main.py
 ```
 
+### Core
+
+The `core/` package contains DESK's application logic.
+
+Some of the main responsibilities include:
+
+| Component | Responsibility |
+|---|---|
+| `inference_manager.py` | AI inference and provider interaction |
+| `compute_manager.py` | Compute-related configuration |
+| `memory_manager.py` | Agent memory |
+| `history_manager.py` | Conversation history |
+| `artifact_manager.py` | Workspace artifacts |
+| `agent_protocol.py` | Structured agent-action extraction |
+| `agent_actions.py` | Action execution |
+| `applications.py` | Cross-platform application discovery and launching |
+| `chrome_profiles.py` | Chrome/Chromium profile discovery |
+| `paths.py` | Application resources and persistent user-data paths |
+
 ---
 
-## How the Workspace Works
+## 🧩 Action Architecture
 
-When an agent responds with code, DESK automatically:
+DESK intentionally keeps **AI reasoning** separate from **machine-specific execution**.
 
-1. Detects every fenced code block in the response
-2. Infers the filename from context — the agent says "here's `index.html`" and DESK reads it
-3. Saves the file to the agent's Workspace folder
-4. If the same filename appears again with different content, a new version is created (max 3 kept)
-5. Suppresses the raw code from the chat — replaces it with a clickable file chip
+For example, an agent may determine:
 
-The agent's explanation stays. The file chip is clickable — opens the Code Inspector on the right side of the screen.
+> "The user wants to open Spotify."
 
----
+The agent does not need to know whether Spotify is located at:
 
-## Building the Executable
-
-```bash
-pip install pyinstaller
-
-py -m PyInstaller main.py \
-  --onefile \
-  --windowed \
-  --name DESK \
-  --add-data "config;config" \
-  --add-data "bucket;bucket" \
-  --add-data "workspace;workspace" \
-  --add-data "ui/styles;ui/styles"
+```text
+/usr/bin/spotify
 ```
 
-Output: `dist/DESK.exe`
+or:
+
+```text
+C:\Users\...\Spotify.exe
+```
+
+Instead, it requests:
+
+```json
+{
+  "action": "open_application",
+  "application": "Spotify"
+}
+```
+
+DESK resolves the application using the host operating system.
+
+This keeps the agent protocol portable while allowing the execution layer to remain OS-specific.
 
 ---
 
-## Design Principles
+## 🎨 Desktop Interface
 
-- **Never hardcode an API call** — everything routes through `InferenceManager`
-- **Refresh never deletes data** — soft UI rebuild only, no history touched
-- **Fire is the only hard delete** — agent + bucket file + config + history + artifacts
-- **Folder as source of truth** — `bucket/` is live-synced, agents appear when `.md` files appear
-- **Local first** — keys stored on your machine, never transmitted anywhere except the provider
+DESK uses **PySide6** for its desktop interface.
 
----
+The interface includes:
 
-## Keyboard Shortcuts
-
-| Shortcut | Action |
-|---|---|
-| `Ctrl+N` | New Agent |
-| `Shift+Tab` | Cycle through agents |
-| `Ctrl+W` | Toggle Workspace panel |
-| `Ctrl+,` | Settings |
+- Agent management
+- Chat interface
+- Persistent conversations
+- Workspace and artifacts
+- Settings
+- Agent configuration
+- Chrome profile configuration
+- Theme and display configuration
 
 ---
 
-## Roadmap
+## 📦 Installation
 
-- **Town Hall** — multi-agent collaboration. Agents talk to each other. You're the founder in the room.
-- **NotePad** — private notepad, separate from agent conversations
-- **ScratchPad** — agent reasoning traces for complex problems
-- **Avatars** — custom visual identity per agent
-- **Agent chaining** — output of one agent feeds into another
-- **Plugin system** — extend agent behavior via Python
+### Download a Release
+
+Pre-built executables are available from the project's GitHub Releases page.
+
+[DESK Releases](https://github.com/Saksham-garg2008/DESK/releases?utm_source=chatgpt.com)
+
+Current release builds include:
+
+- Windows executable
+- Linux executable
 
 ---
 
-## License
+### Run From Source
 
-MIT
+Clone the repository:
+
+```bash
+git clone https://github.com/Saksham-garg2008/DESK.git
+cd DESK
+```
+
+Create a virtual environment:
+
+```bash
+python -m venv .venv
+```
+
+Activate it on Linux/macOS:
+
+```bash
+source .venv/bin/activate
+```
+
+On Windows:
+
+```powershell
+.venv\Scripts\activate
+```
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Run DESK:
+
+```bash
+python main.py
+```
+
+---
+
+## ⚙️ Requirements
+
+DESK is built with:
+
+- **Python**
+- **PySide6**
+- AI provider APIs configured by the user
+
+The current dependency footprint is intentionally small.
+
+---
+
+## 🔧 Configuration
+
+DESK keeps application resources separate from persistent user data.
+
+Bundled resources belong to the application installation, while user-generated data is stored in the platform-specific DESK data directory.
+
+This separation is particularly important for packaged applications such as PyInstaller builds, where the application itself may be replaced during an update.
+
+DESK also maintains a small data-version marker to support future data migrations without tying user data to a particular application executable.
+
+---
+
+## 🛠️ Building DESK
+
+DESK uses GitHub Actions to produce packaged builds for supported desktop platforms.
+
+The build system packages DESK into standalone executables using **PyInstaller**.
+
+Release artifacts are published through GitHub Releases.
+
+---
+
+## 📚 Documentation
+
+For deeper technical information, see the **DESK Wiki**.
+
+The Wiki covers areas such as:
+
+- Architecture
+- Agents
+- AI providers
+- Agent actions
+- Browser integration
+- Application discovery
+- Memory
+- Workspace
+- Persistence
+- Configuration
+- Development
+- Building and releasing DESK
+
+---
+
+## 👨‍💻 Development
+
+DESK is an actively developed open-source project.
+
+The codebase is intentionally kept modular so that new capabilities can be added without tightly coupling AI inference, the user interface, and operating-system-specific functionality.
+
+---
+
+**DESK** — AI that works from your desktop.
