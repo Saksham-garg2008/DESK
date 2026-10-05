@@ -1,1 +1,2 @@
 PySide6>=6.6.0
+qrcode[pil]>=8.0
