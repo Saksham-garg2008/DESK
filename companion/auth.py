@@ -52,6 +52,12 @@ class CompanionAuth:
         self._pairing_expires_at = (
             time.time() + self.PAIRING_CODE_LIFETIME
         )
+        print(
+            "[Companion] Pairing created:",
+            self._pairing_code,
+            "auth_id=",
+            id(self),
+        )
 
         return {
             "code": code,
@@ -80,14 +86,35 @@ class CompanionAuth:
 
         Returns device credentials once.
         """
+        print(
+            "[Companion] Pairing request:",
+            "received=",
+            repr(code),
+            "active=",
+            repr(self._pairing_code),
+            "auth_id=",
+            id(self),
+        )
 
         if not self._pairing_is_active():
+            print(
+                "[Companion] Pairing rejected: "
+                f"code={code!r}, "
+                f"active_code={self._pairing_code!r}, "
+                f"expires_at={self._pairing_expires_at}, "
+                f"now={time.time()}"
+            )
             return None
 
         if not secrets.compare_digest(
             str(code),
             str(self._pairing_code),
         ):
+            print(
+                "[Companion] Pairing rejected: "
+                f"received={code!r}, "
+                f"expected={self._pairing_code!r}"
+            )
             return None
 
         # Pairing codes are single-use.
