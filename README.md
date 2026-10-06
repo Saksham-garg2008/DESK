@@ -1,10 +1,32 @@
 # DESK
 
-> A lightweight, cross-platform AI desktop assistant built around persistent agents, local workspace tools, and controlled agentic actions.
+<p align="center">
+  <strong>AI that works from your desktop.</strong><br>
+  A lightweight, cross-platform AI desktop assistant built with Python and PySide6.
+</p>
 
-DESK is a desktop AI assistant built with **Python and PySide6**. It combines conversational AI with persistent agents, memory, workspace management, and a growing set of actions that allow an agent to interact with the user's desktop.
+<p align="center">
+  <a href="https://github.com/Saksham-garg2008/DESK/releases"><img src="https://img.shields.io/github/v/release/Saksham-garg2008/DESK?style=flat-square&label=release" alt="Latest Release"></a>
+  <a href="https://github.com/Saksham-garg2008/DESK"><img src="https://img.shields.io/github/stars/Saksham-garg2008/DESK?style=flat-square" alt="GitHub Stars"></a>
+  <a href="https://github.com/Saksham-garg2008/DESK/issues"><img src="https://img.shields.io/github/issues/Saksham-garg2008/DESK?style=flat-square" alt="GitHub Issues"></a>
+  <img src="https://img.shields.io/badge/Python-3.x-blue?style=flat-square" alt="Python">
+  <img src="https://img.shields.io/badge/PySide6-Desktop%20UI-blue?style=flat-square" alt="PySide6">
+  <img src="https://img.shields.io/badge/Platforms-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey?style=flat-square" alt="Platforms">
+</p>
 
-DESK is designed to remain **simple, lightweight, and practical** rather than relying on large local AI frameworks.
+---
+
+## About DESK
+
+DESK is a lightweight desktop AI assistant built with **Python and PySide6**.
+
+It combines conversational AI with persistent agents, memory, workspace management, browser capabilities, and controlled desktop actions.
+
+DESK is designed around a simple principle:
+
+> **The AI decides what it wants to do. DESK decides how that action is executed.**
+
+The project keeps AI reasoning separate from machine-specific execution, allowing agents to work with high-level intents without needing to know local executable paths, browser profile directories, or operating-system-specific commands.
 
 ---
 
@@ -14,51 +36,37 @@ DESK is designed to remain **simple, lightweight, and practical** rather than re
 
 Create multiple AI agents with their own personas and configurations.
 
-Each agent can maintain its own context while sharing the same DESK environment.
-
 - Multiple independent agents
 - Persistent agent configuration
 - Custom agent personas
 - Per-agent AI configuration
 - Agent-specific Chrome profiles
 
----
-
 ### 🧠 Memory & Persistence
 
 DESK keeps important application data across sessions.
 
-Conversation history, memory, workspace data, and configuration are stored outside the application bundle so that user data survives application restarts and executable updates.
-
-DESK uses platform-appropriate locations for persistent data:
+Conversation history, memory, workspace data, and configuration are stored outside the application bundle so user data can survive application restarts and executable updates.
 
 | Platform | Data location |
-|---|---|
+| --- | --- |
 | Windows | `%APPDATA%\DESK` |
 | Linux | `$XDG_DATA_HOME/DESK` or `~/.local/share/DESK` |
 | macOS | `~/Library/Application Support/DESK` |
-
----
 
 ### 🌐 Browser Actions
 
 Agents can request browser actions through DESK's structured action system.
 
-For example, an agent can request that DESK open a website without needing to know how the user's browser is installed.
+An agent can determine what should be opened while DESK handles the actual browser configuration.
 
-DESK can also use a configured Chrome profile for an agent.
-
-This means the **agent decides what it wants to open, while DESK controls which browser configuration is actually used.**
-
----
+Chrome profiles can be configured per agent, keeping local browser configuration outside the model's decision-making process.
 
 ### 🖥️ Application Actions
 
 DESK can open installed desktop applications using a human-readable application name.
 
-The application launcher is designed to avoid maintaining a hardcoded list of applications.
-
-Instead, DESK resolves applications using information provided by the operating system:
+The application launcher avoids maintaining a manually hardcoded application list and instead resolves applications using information provided by the operating system.
 
 - **Linux** — discovers applications through `.desktop` entries
 - **Windows** — searches Start Menu shortcuts
@@ -85,7 +93,7 @@ An agent can request an action using a structured format:
 
 DESK then extracts, validates, and executes the requested action.
 
-This creates an important separation:
+The basic flow is:
 
 ```text
 User
@@ -112,7 +120,7 @@ The model does **not** need to know the user's local executable paths, Chrome pr
 
 ## 🏗️ Architecture
 
-DESK is organized into several core components.
+DESK is organized into separate components so that the user interface, AI inference, memory, workspace, and desktop actions remain modular.
 
 ```text
 DESK
@@ -134,22 +142,15 @@ DESK
 │   └── chat_panel.py
 │
 ├── config/
-│
 ├── bucket/
-│
 ├── workspace/
-│
 └── main.py
 ```
 
-### Core
-
-The `core/` package contains DESK's application logic.
-
-Some of the main responsibilities include:
+### Core Components
 
 | Component | Responsibility |
-|---|---|
+| --- | --- |
 | `inference_manager.py` | AI inference and provider interaction |
 | `compute_manager.py` | Compute-related configuration |
 | `memory_manager.py` | Agent memory |
@@ -158,8 +159,8 @@ Some of the main responsibilities include:
 | `agent_protocol.py` | Structured agent-action extraction |
 | `agent_actions.py` | Action execution |
 | `applications.py` | Cross-platform application discovery and launching |
-| `chrome_profiles.py` | Chrome/Chromium profile discovery |
-| `paths.py` | Application resources and persistent user-data paths |
+| `chrome_profiles.py` | Chrome/Chromium profile handling |
+| `paths.py` | Application and persistent-data paths |
 
 ---
 
@@ -171,19 +172,9 @@ For example, an agent may determine:
 
 > "The user wants to open Spotify."
 
-The agent does not need to know whether Spotify is located at:
+The agent does not need to know where Spotify is installed.
 
-```text
-/usr/bin/spotify
-```
-
-or:
-
-```text
-C:\Users\...\Spotify.exe
-```
-
-Instead, it requests:
+Instead, it can request:
 
 ```json
 {
@@ -195,6 +186,16 @@ Instead, it requests:
 DESK resolves the application using the host operating system.
 
 This keeps the agent protocol portable while allowing the execution layer to remain OS-specific.
+
+---
+
+## 📱 DESK Companion
+
+DESK is also being developed alongside an Android companion project.
+
+**[DESK Companion](https://github.com/Saksham-garg2008/DESK-Companion)**
+
+The desktop application remains the core DESK project, while the Android companion is maintained separately as its own repository.
 
 ---
 
@@ -221,14 +222,12 @@ The interface includes:
 
 Pre-built executables are available from the project's GitHub Releases page.
 
-[DESK Releases](https://github.com/Saksham-garg2008/DESK/releases?utm_source=chatgpt.com)
+**[Download DESK Releases](https://github.com/Saksham-garg2008/DESK/releases)**
 
 Current release builds include:
 
 - Windows executable
 - Linux executable
-
----
 
 ### Run From Source
 
@@ -279,27 +278,23 @@ DESK is built with:
 - **PySide6**
 - AI provider APIs configured by the user
 
-The current dependency footprint is intentionally small.
+The project intentionally keeps its dependency footprint small.
 
 ---
 
-## 🔧 Configuration
+## 🔧 Configuration & Data
 
 DESK keeps application resources separate from persistent user data.
 
 Bundled resources belong to the application installation, while user-generated data is stored in the platform-specific DESK data directory.
 
-This separation is particularly important for packaged applications such as PyInstaller builds, where the application itself may be replaced during an update.
-
-DESK also maintains a small data-version marker to support future data migrations without tying user data to a particular application executable.
+This separation is particularly important for packaged applications, where the application itself may be replaced during an update.
 
 ---
 
 ## 🛠️ Building DESK
 
-DESK uses GitHub Actions to produce packaged builds for supported desktop platforms.
-
-The build system packages DESK into standalone executables using **PyInstaller**.
+DESK uses **PyInstaller** for packaged application builds and **GitHub Actions** for automated release builds.
 
 Release artifacts are published through GitHub Releases.
 
@@ -307,31 +302,29 @@ Release artifacts are published through GitHub Releases.
 
 ## 📚 Documentation
 
-For deeper technical information, see the **DESK Wiki**.
-
-The Wiki covers areas such as:
+The **DESK Wiki** contains deeper technical documentation covering:
 
 - Architecture
-- Agents
-- AI providers
-- Agent actions
-- Browser integration
+- Agents and memory
+- Agentic actions
+- Browser actions
 - Application discovery
-- Memory
-- Workspace
-- Persistence
+- Data and persistence
 - Configuration
-- Development
-- Building and releasing DESK
+- Building from source
+- Contributing
 
 ---
 
-## 👨‍💻 Development
+## 🤝 Contributing
 
-DESK is an actively developed open-source project.
+Contributions, ideas, bug reports, and improvements are welcome.
 
-The codebase is intentionally kept modular so that new capabilities can be added without tightly coupling AI inference, the user interface, and operating-system-specific functionality.
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for contribution guidelines.
 
 ---
 
-**DESK** — AI that works from your desktop.
+<p align="center">
+  <strong>DESK</strong><br>
+  AI that works from your desktop.
+</p>

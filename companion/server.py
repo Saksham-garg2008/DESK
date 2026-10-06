@@ -3,7 +3,7 @@ DESK Companion Server
 """
 
 from __future__ import annotations
-from companion.discovery import CompanionDiscovery
+
 import json
 from http.server import (
     BaseHTTPRequestHandler,
@@ -12,6 +12,7 @@ from http.server import (
 from threading import Thread
 
 from companion.auth import CompanionAuth
+from companion.discovery import CompanionDiscovery
 from companion.protocol import CompanionProtocol
 
 
@@ -23,40 +24,30 @@ class CompanionRequestHandler(BaseHTTPRequestHandler):
     protocol: CompanionProtocol | None = None
     auth: CompanionAuth | None = None
 
-    # --------------------------------------------------------------
-    # Helpers
-    # --------------------------------------------------------------
-
     def _send_json(
         self,
         data: dict,
         status: int = 200,
     ) -> None:
-
         body = json.dumps(data).encode("utf-8")
 
         self.send_response(status)
-
         self.send_header(
             "Content-Type",
             "application/json",
         )
-
         self.send_header(
             "Content-Length",
             str(len(body)),
         )
-
         self.send_header(
             "Access-Control-Allow-Origin",
             "*",
         )
-
         self.send_header(
             "Access-Control-Allow-Headers",
             "Content-Type, X-DESK-Device-ID, X-DESK-Token",
         )
-
         self.end_headers()
 
         self.wfile.write(body)
@@ -75,9 +66,15 @@ class CompanionRequestHandler(BaseHTTPRequestHandler):
         body = self.rfile.read(length)
 
         try:
-            return json.loads(
+            data = json.loads(
                 body.decode("utf-8")
             )
+
+            return data if isinstance(
+                data,
+                dict,
+            ) else {}
+
         except json.JSONDecodeError:
             return {}
 
@@ -88,7 +85,6 @@ class CompanionRequestHandler(BaseHTTPRequestHandler):
         device_id = self.headers.get(
             "X-DESK-Device-ID"
         )
-
         token = self.headers.get(
             "X-DESK-Token"
         )
@@ -115,64 +111,125 @@ class CompanionRequestHandler(BaseHTTPRequestHandler):
 
         return False
 
-    # --------------------------------------------------------------
-    # GET
-    # --------------------------------------------------------------
+    def _handle_get_action(
+        self,
+        action: str,
+        payload: dict | None = None,
+    ) -> None:
+
+        if not self._require_auth():
+            return
+
+        if self.protocol is None:
+            self._send_json(
+                {
+                    "success": False,
+                    "error": "Protocol unavailable",
+                },
+                status=500,
+            )
+            return
+
+        result = self.protocol.handle_request(
+            action,
+            payload,
+        )
+
+        status = (
+            200
+            if result.get("success")
+            else 400
+        )
+
+        self._send_json(
+            result,
+            status=status,
+        )
 
     def do_GET(self) -> None:
+        path = self.path.split(
+            "?",
+            1,
+        )[0]
 
-        path = self.path.split("?", 1)[0]
+        # --------------------------------------------------------------
+        # Basic
+        # --------------------------------------------------------------
 
         if path == "/api/status":
-
-            if not self._require_auth():
-                return
-
-            result = self.protocol.handle_request(
-                "status"
-            )
-
-            self._send_json(result)
+            self._handle_get_action("status")
             return
 
         if path == "/api/agents":
+            self._handle_get_action("agents")
+            return
 
-            if not self._require_auth():
-                return
-
-            result = self.protocol.handle_request(
-                "agents"
-            )
-
-            self._send_json(result)
+        if path == "/api/models":
+            self._handle_get_action("models")
             return
 
         if path == "/api/tasks":
-
-            if not self._require_auth():
-                return
-
-            result = self.protocol.handle_request(
-                "tasks"
-            )
-
-            self._send_json(result)
+            self._handle_get_action("tasks")
             return
 
         if path == "/api/workspace":
-
-            if not self._require_auth():
-                return
-
-            result = self.protocol.handle_request(
-                "workspace"
-            )
-
-            self._send_json(result)
+            self._handle_get_action("workspace")
             return
 
-        if path == "/api/devices":
+        # --------------------------------------------------------------
+        # Agent-specific resources
+        # --------------------------------------------------------------
 
+        if path.startswith("/api/agents/"):
+            parts = path.split("/")
+
+            # /api/agents/<agent>
+            if len(parts) == 4:
+                agent_name = parts[3]
+
+                self._handle_get_action(
+                    "agent",
+                    {
+                        "agent": agent_name,
+                    },
+                )
+                return
+
+            # /api/agents/<agent>/memory
+            if (
+                len(parts) == 5
+                and parts[4] == "memory"
+            ):
+                agent_name = parts[3]
+
+                self._handle_get_action(
+                    "memory",
+                    {
+                        "agent": agent_name,
+                    },
+                )
+                return
+
+            # /api/agents/<agent>/artifacts
+            if (
+                len(parts) == 5
+                and parts[4] == "artifacts"
+            ):
+                agent_name = parts[3]
+
+                self._handle_get_action(
+                    "artifacts",
+                    {
+                        "agent": agent_name,
+                    },
+                )
+                return
+
+        # --------------------------------------------------------------
+        # Devices
+        # --------------------------------------------------------------
+
+        if path == "/api/devices":
             if not self._require_auth():
                 return
 
@@ -192,21 +249,28 @@ class CompanionRequestHandler(BaseHTTPRequestHandler):
             status=404,
         )
 
-    # --------------------------------------------------------------
-    # POST
-    # --------------------------------------------------------------
-
     def do_POST(self) -> None:
-
-        path = self.path.split("?", 1)[0]
+        path = self.path.split(
+            "?",
+            1,
+        )[0]
 
         payload = self._read_json()
 
-        # ----------------------------------------------------------
+        # --------------------------------------------------------------
         # Pairing
-        # ----------------------------------------------------------
+        # --------------------------------------------------------------
 
         if path == "/api/pair":
+            if self.auth is None:
+                self._send_json(
+                    {
+                        "success": False,
+                        "error": "Authentication unavailable",
+                    },
+                    status=500,
+                )
+                return
 
             code = str(
                 payload.get(
@@ -231,11 +295,13 @@ class CompanionRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(
                     {
                         "success": False,
-                        "error": "Invalid or expired pairing code",
+                        "error": (
+                            "Invalid or expired "
+                            "pairing code"
+                        ),
                     },
                     status=401,
                 )
-
                 return
 
             self._send_json(
@@ -244,15 +310,13 @@ class CompanionRequestHandler(BaseHTTPRequestHandler):
                     "device": result,
                 }
             )
-
             return
 
-        # ----------------------------------------------------------
-        # Ping
-        # ----------------------------------------------------------
+        # --------------------------------------------------------------
+        # Authenticated endpoints
+        # --------------------------------------------------------------
 
         if path == "/api/ping":
-
             if not self._require_auth():
                 return
 
@@ -260,16 +324,43 @@ class CompanionRequestHandler(BaseHTTPRequestHandler):
                 {
                     "success": True,
                     "message": (
-                        "DESK Companion connection successful"
+                        "DESK Companion connection "
+                        "successful"
                     ),
                 }
             )
-
             return
 
-        # ----------------------------------------------------------
-        # Unknown endpoint
-        # ----------------------------------------------------------
+        if path == "/api/agents":
+            if not self._require_auth():
+                return
+
+            if self.protocol is None:
+                self._send_json(
+                    {
+                        "success": False,
+                        "error": "Protocol unavailable",
+                    },
+                    status=500,
+                )
+                return
+
+            result = self.protocol.handle_request(
+                "create_agent",
+                payload,
+            )
+
+            status = (
+                200
+                if result.get("success")
+                else 400
+            )
+
+            self._send_json(
+                result,
+                status=status,
+            )
+            return
 
         self._send_json(
             {
@@ -279,24 +370,21 @@ class CompanionRequestHandler(BaseHTTPRequestHandler):
             status=404,
         )
 
-    # --------------------------------------------------------------
-    # OPTIONS
-    # --------------------------------------------------------------
-
     def do_OPTIONS(self) -> None:
-
         self.send_response(204)
 
         self.send_header(
             "Access-Control-Allow-Origin",
             "*",
         )
-
         self.send_header(
             "Access-Control-Allow-Headers",
-            "Content-Type, X-DESK-Device-ID, X-DESK-Token",
+            (
+                "Content-Type, "
+                "X-DESK-Device-ID, "
+                "X-DESK-Token"
+            ),
         )
-
         self.send_header(
             "Access-Control-Allow-Methods",
             "GET, POST, OPTIONS",
@@ -306,12 +394,9 @@ class CompanionRequestHandler(BaseHTTPRequestHandler):
 
     def log_message(
         self,
-        format: str,
+        format,
         *args,
     ) -> None:
-        """
-        Keep DESK console clean.
-        """
         return
 
 
@@ -331,24 +416,28 @@ class CompanionServer:
         self.protocol = CompanionProtocol()
         self.auth = CompanionAuth()
 
-        CompanionRequestHandler.protocol = self.protocol
-        CompanionRequestHandler.auth = self.auth
+        CompanionRequestHandler.protocol = (
+            self.protocol
+        )
+        CompanionRequestHandler.auth = (
+            self.auth
+        )
 
         self._server = ThreadingHTTPServer(
-            (self.host, self.port),
+            (
+                self.host,
+                self.port,
+            ),
             CompanionRequestHandler,
         )
-        self.discovery = CompanionDiscovery(port=self.port)
 
+        self.discovery = CompanionDiscovery(
+            port=self.port
+        )
 
         self._thread: Thread | None = None
 
-    # --------------------------------------------------------------
-    # Lifecycle
-    # --------------------------------------------------------------
-
     def start(self) -> None:
-
         if self._thread is not None:
             return
 
@@ -361,7 +450,6 @@ class CompanionServer:
         self.discovery.start()
 
     def stop(self) -> None:
-
         if self._thread is None:
             return
 
@@ -374,10 +462,6 @@ class CompanionServer:
     @property
     def running(self) -> bool:
         return self._thread is not None
-
-    # --------------------------------------------------------------
-    # Pairing
-    # --------------------------------------------------------------
 
     def create_pairing(self) -> dict:
         return self.auth.create_pairing()
