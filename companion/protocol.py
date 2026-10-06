@@ -115,13 +115,30 @@ class CompanionProtocol(QObject):
 
     def get_agent(self, agent_name: str) -> dict | None:
         """
-        Return a single agent configuration.
+        Return a single agent configuration, including its system prompt.
         """
 
         config = get_agent_config(agent_name)
 
         if not config:
             return None
+
+        system_prompt = config.get(
+            "system_prompt",
+            "",
+        )
+
+        # Fall back to the actual bucket file if necessary.
+        if not system_prompt:
+            md_path = BUCKET_DIR / f"{agent_name}.md"
+
+            try:
+                if md_path.is_file():
+                    system_prompt = md_path.read_text(
+                        encoding="utf-8"
+                    )
+            except (OSError, UnicodeDecodeError):
+                system_prompt = ""
 
         return {
             "name": agent_name,
@@ -145,6 +162,7 @@ class CompanionProtocol(QObject):
                 "chrome_profile",
                 None,
             ),
+            "system_prompt": system_prompt,
         }
 
     def create_agent(
@@ -284,6 +302,62 @@ class CompanionProtocol(QObject):
             "available": True,
             "path": str(WORKSPACE_DIR),
             "items": items,
+        }
+
+    def get_workspace_file(
+    self,
+    relative_path: str,
+) -> dict:
+        """
+        Return the contents of a text file inside DESK's workspace.
+
+        The supplied path must remain inside WORKSPACE_DIR.
+        """
+
+        relative_path = str(relative_path).strip()
+
+        if not relative_path:
+            raise ValueError("File path is required")
+
+        workspace_root = WORKSPACE_DIR.resolve()
+        file_path = (workspace_root / relative_path).resolve()
+
+        # Prevent ../ traversal and files outside the workspace.
+        try:
+            file_path.relative_to(workspace_root)
+        except ValueError:
+            raise ValueError("Invalid workspace path")
+
+        if not file_path.is_file():
+            raise ValueError("Workspace file not found")
+
+        # Prevent accidentally sending enormous files to Android.
+        MAX_FILE_SIZE = 2 * 1024 * 1024  # 2 MB
+
+        file_size = file_path.stat().st_size
+
+        if file_size > MAX_FILE_SIZE:
+            raise ValueError(
+                "File is too large to open in Companion"
+            )
+
+        try:
+            content = file_path.read_text(
+                encoding="utf-8"
+            )
+        except UnicodeDecodeError:
+            raise ValueError(
+                "This file is not a UTF-8 text file"
+            )
+
+        return {
+            "name": file_path.name,
+            "path": str(
+                file_path.relative_to(workspace_root)
+            ),
+            "content": content,
+            "size": file_size,
+            "type": "text",
         }
 
     # ------------------------------------------------------------------
@@ -472,6 +546,21 @@ class CompanionProtocol(QObject):
 
             elif action == "workspace":
                 result = self.get_workspace()
+
+            elif action == "workspace_file":
+                file_path = str(
+                    payload.get("path", "")
+                ).strip()
+
+                if not file_path:
+                    return {
+                        "success": False,
+                        "error": "File path is required",
+                    }
+
+                result = self.get_workspace_file(
+                    file_path
+                )
 
             elif action == "artifacts":
                 agent_name = str(

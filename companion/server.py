@@ -14,7 +14,7 @@ from threading import Thread
 from companion.auth import CompanionAuth
 from companion.discovery import CompanionDiscovery
 from companion.protocol import CompanionProtocol
-
+from urllib.parse import unquote
 
 class CompanionRequestHandler(BaseHTTPRequestHandler):
     """
@@ -174,6 +174,26 @@ class CompanionRequestHandler(BaseHTTPRequestHandler):
 
         if path == "/api/workspace":
             self._handle_get_action("workspace")
+            return
+
+        if path.startswith("/api/workspace/file/"):
+            if not self._require_auth():
+                return
+
+            encoded_path = path[
+                len("/api/workspace/file/") :
+            ]
+
+            relative_path = unquote(
+                encoded_path
+            )
+
+            self._handle_get_action(
+                "workspace_file",
+                {
+                    "path": relative_path,
+                },
+            )
             return
 
         # --------------------------------------------------------------
