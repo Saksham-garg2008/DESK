@@ -315,6 +315,11 @@ class NewAgentDialog(QDialog):
             )
         )
 
+        layout.addWidget(self._field_label("CUSTOM BASE URL (OPTIONAL)"))
+        self.base_url_input = QLineEdit()
+        self.base_url_input.setPlaceholderText("http://localhost:8080 (empty = default from model.json)")
+        layout.addWidget(self.base_url_input)
+
         # Populate initial models
         self._on_backend_change(0)
 
@@ -398,6 +403,7 @@ class NewAgentDialog(QDialog):
             "color": self.selected_color,
             "backend": backend,
             "model": model,
+            "base_url": self.base_url_input.text().strip(),
             "response_length": "standard",
             "system_prompt": self._system_prompt,
             "chrome_profile": chrome_profile,

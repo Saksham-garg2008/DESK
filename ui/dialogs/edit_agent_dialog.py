@@ -40,6 +40,7 @@ class EditAgentDialog(QDialog):
         self.selected_color = cfg.get("color", AGENT_COLORS[0])
         self._current_backend = cfg.get("backend", "ollama")
         self._current_model   = cfg.get("model", "")
+        self._current_base_url = cfg.get("base_url", "")
         self._current_chrome_profile = cfg.get(
             "chrome_profile",
             None,
@@ -133,6 +134,12 @@ class EditAgentDialog(QDialog):
                 self.model_combo.currentData() == "custom"
             )
         )
+
+        layout.addWidget(self._lbl("CUSTOM BASE URL (OPTIONAL)"))
+        self.base_url_input = QLineEdit()
+        self.base_url_input.setPlaceholderText("http://localhost:8080 or http://192.168.1.50:11434")
+        self.base_url_input.setText(self._current_base_url)
+        layout.addWidget(self.base_url_input)
 
 
         # ── Chrome Profile ────────────────────────────────────────────────
@@ -246,11 +253,9 @@ class EditAgentDialog(QDialog):
             "color": self.selected_color,
             "backend": backend,
             "model": model,
+            "base_url": self.base_url_input.text().strip(),
             "system_prompt": new_prompt,
-            "response_length": existing.get(
-                "response_length",
-                "standard",
-            ),
+            "response_length": existing.get("response_length", "standard"),
             "chrome_profile": self.chrome_profile_combo.currentData(),
         })
 
