@@ -171,7 +171,11 @@ class CompanionRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/tasks":
             self._handle_get_action("tasks")
             return
-
+        
+        if path == "/api/artifacts":
+            self._handle_get_action("all_artifacts")
+            return
+    
         if path == "/api/workspace":
             self._handle_get_action("workspace")
             return
