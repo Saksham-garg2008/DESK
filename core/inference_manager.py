@@ -29,6 +29,7 @@ class InferenceManager:
         messages: list[dict],
         response_length: str = "standard",
         stream: bool = True,
+        base_url: str = "",
     ) -> Generator[str, None, None]:
         """
         Route a chat request to the correct backend.
@@ -37,10 +38,23 @@ class InferenceManager:
         length_instruction = RESPONSE_LENGTH_MAP.get(response_length, "")
         full_system = f"{system_prompt}\n\n{length_instruction}".strip()
 
+        # ── Dynamic URL resolution ──────────────────────────────────
+        # Priority: 1) GUI field  2) model.json  3) Hardcoded fallback
+
+        if not base_url:
+            backend_cfg = self.models_config.get("backends", {}).get(backend, {})
+            base_url = backend_cfg.get("base_url", "")
+        if not base_url and backend == "ollama":
+            base_url = "http://localhost:11434"
+        if not base_url and backend == "local":
+            base_url = "http://localhost:8080"
+
         if backend == "ollama":
-            yield from self._ollama(model, full_system, messages, stream)
+            yield from self._ollama(model, base_url, full_system, messages, stream)
         elif backend == "openai":
             yield from self._openai(model, full_system, messages)
+        elif backend == "local":
+            yield from self._local(model, base_url, full_system, messages, stream)
         elif backend == "anthropic":
             yield from self._anthropic(model, full_system, messages)
         elif backend == "gemini":
@@ -56,8 +70,8 @@ class InferenceManager:
 
     # ─── OLLAMA (Local) ───────────────────────────────────────────────────────
 
-    def _ollama(self, model: str, system: str, messages: list, stream: bool) -> Generator:
-        url = "http://localhost:11434/api/chat"
+    def _ollama(self, model: str, base_url: str, system: str, messages: list, stream: bool) -> Generator:
+        url = f"{base_url.rstrip('/')}/api/chat"
         payload = {
             "model": model,
             "stream": stream,
@@ -79,7 +93,39 @@ class InferenceManager:
                         if chunk.get("done"):
                             break
         except Exception as e:
-            yield f"[Ollama Error] {e}"
+            yield f"[Ollama Error] Could not reach {base_url}: {e}"
+
+    # ─── Local (e.g. llamacpp) ───────────────────────────────────────────────────────
+
+    def _local(self, model: str, base_url: str, system: str, messages: list, stream: bool) -> Generator:
+        url = f"{base_url.rstrip('/')}/v1/chat/completions"
+        payload = {
+            "model": model,
+            "stream": stream,
+            "messages": [{"role": "system", "content": system}] + messages,
+        }
+        try:
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode(),
+                headers={"Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                for line in resp:
+                    line = line.decode().strip()
+                    if line.startswith("data:"):
+                        data = line[5:].strip()
+                        if data == "[DONE]":
+                            break
+                        try:
+                            chunk = json.loads(data)
+                            delta = chunk["choices"][0]["delta"].get("content", "")
+                            if delta:
+                                yield delta
+                        except Exception:
+                            pass
+        except Exception as e:
+            yield f"[Local API Error] Could not reach {base_url}: {e}"
 
     # ─── OPENAI ───────────────────────────────────────────────────────────────
 

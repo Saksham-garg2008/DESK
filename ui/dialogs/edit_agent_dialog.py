@@ -26,7 +26,7 @@ AGENT_COLORS = [
 
 
 class EditAgentDialog(QDialog):
-    agent_updated = Signal(str, str, str)  # old_name, new_name, color
+    agent_updated = Signal(str, str, str) # old_name, new_name, color
 
     def __init__(self, agent_name: str, parent=None):
         super().__init__(parent)
@@ -40,6 +40,7 @@ class EditAgentDialog(QDialog):
         self.selected_color = cfg.get("color", AGENT_COLORS[0])
         self._current_backend = cfg.get("backend", "ollama")
         self._current_model   = cfg.get("model", "")
+        self._current_base_url = cfg.get("base_url", "")
         self._current_chrome_profile = cfg.get(
             "chrome_profile",
             None,
@@ -134,8 +135,17 @@ class EditAgentDialog(QDialog):
             )
         )
 
+        # ── Custom Base URL ────────────────────────────────────────────
 
-        # ── Chrome Profile ────────────────────────────────────────────────
+        layout.addWidget(self._lbl("BASE URL (OPTIONAL)"))
+        self.base_url_input = QLineEdit()
+        self.base_url_input.setPlaceholderText(
+            "e.g. http://localhost:8080 — leave empty for default"
+        )
+        self.base_url_input.setText(self._current_base_url)
+        layout.addWidget(self.base_url_input)
+
+        # ── Chrome Profile ─────────────────────────────────────────────
 
         layout.addWidget(self._lbl("CHROME PROFILE"))
 
@@ -246,6 +256,7 @@ class EditAgentDialog(QDialog):
             "color": self.selected_color,
             "backend": backend,
             "model": model,
+            "base_url": self.base_url_input.text().strip(),
             "system_prompt": new_prompt,
             "response_length": existing.get(
                 "response_length",

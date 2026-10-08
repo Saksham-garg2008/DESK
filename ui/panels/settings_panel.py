@@ -278,11 +278,16 @@ class SettingsPanel(QWidget):
         custom_model_input.setPlaceholderText("Enter model name...")
         custom_model_input.setVisible(model_combo.currentData() == "custom")
 
+        # Base URL override (per-agent)
+        base_url_input = QLineEdit()
+        base_url_input.setPlaceholderText("Base URL override (optional)")
+        base_url_input.setText(cfg.get("base_url", ""))
+
         save_btn = QPushButton("Save")
         save_btn.setObjectName("key_save_btn")
         save_btn.clicked.connect(
-            lambda checked, n=name, bc=backend_combo, mc=model_combo, c=cfg, ci=custom_model_input:
-            self._save_agent_config(n, bc, mc, c, ci)
+            lambda checked, n=name, bc=backend_combo, mc=model_combo, c=cfg, ci=custom_model_input, bu=base_url_input:
+            self._save_agent_config(n, bc, mc, c, ci, bu)
         )
 
         dropdowns_row.addWidget(QLabel("Backend:"))
@@ -296,7 +301,7 @@ class SettingsPanel(QWidget):
         # to this row, NOT a shared self. attribute, so each agent card
         # keeps its own independent custom-model field.
         layout.addWidget(custom_model_input)
-
+        layout.addWidget(base_url_input)
         model_combo.currentIndexChanged.connect(
             lambda i, mc=model_combo, ci=custom_model_input: ci.setVisible(
                 mc.currentData() == "custom"
@@ -322,13 +327,13 @@ class SettingsPanel(QWidget):
 
     def _save_agent_config(self, name: str, backend_combo: QComboBox,
                            model_combo: QComboBox, existing_cfg: dict,
-                           custom_input: QLineEdit):
+                           custom_input: QLineEdit,
+                           base_url_input: QLineEdit):
         backend = backend_combo.currentData()
         model = model_combo.currentData()
         if model == "custom" and custom_input.text().strip():
             model = custom_input.text().strip()
-
-        updated = {**existing_cfg, "backend": backend, "model": model}
+        updated = {**existing_cfg, "backend": backend, "model": model, "base_url": base_url_input.text().strip()}
         set_agent_config(name, updated)
 
     def _set_compute(self, mode: str):
