@@ -419,6 +419,31 @@ class CompanionProtocol(QObject):
 
         return result
 
+    
+    def get_all_artifacts(self) -> list[dict]:
+        """
+        Return artifact metadata grouped by currently existing agents.
+
+        Uses DESK's existing agent configuration and ArtifactManager.
+        """
+
+        result = []
+
+        for agent in self.get_agents():
+            agent_name = agent["name"]
+            artifacts = self.get_artifacts(agent_name)
+
+            if artifacts:
+                result.append(
+                    {
+                        "agent": agent_name,
+                        "artifacts": artifacts,
+                    }
+                )
+
+        return result
+
+
     # ------------------------------------------------------------------
     # Tasks
     # ------------------------------------------------------------------
@@ -576,6 +601,9 @@ class CompanionProtocol(QObject):
                 result = self.get_artifacts(
                     agent_name
                 )
+                    
+            elif action == "all_artifacts":
+                result = self.get_all_artifacts()
 
             elif action == "models":
                 result = self.get_models()
