@@ -137,6 +137,12 @@ class EditAgentDialog(QDialog):
 
         # ── Custom Base URL ────────────────────────────────────────────
 
+        layout.addWidget(self._lbl("CUSTOM BASE URL (OPTIONAL)"))
+        self.base_url_input = QLineEdit()
+        self.base_url_input.setPlaceholderText("http://localhost:8080 or http://192.168.1.50:11434")
+        self.base_url_input.setText(self._current_base_url)
+        layout.addWidget(self.base_url_input)
+
         layout.addWidget(self._lbl("BASE URL (OPTIONAL)"))
         self.base_url_input = QLineEdit()
         self.base_url_input.setPlaceholderText(
@@ -258,10 +264,7 @@ class EditAgentDialog(QDialog):
             "model": model,
             "base_url": self.base_url_input.text().strip(),
             "system_prompt": new_prompt,
-            "response_length": existing.get(
-                "response_length",
-                "standard",
-            ),
+            "response_length": existing.get("response_length", "standard"),
             "chrome_profile": self.chrome_profile_combo.currentData(),
         })
 
