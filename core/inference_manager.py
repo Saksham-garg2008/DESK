@@ -94,38 +94,6 @@ class InferenceManager:
         except Exception as e:
             yield f"[Ollama Error] Could not reach {base_url}: {e}"
 
-    # ─── Local (e.g. llamacpp) ───────────────────────────────────────────────────────
-
-    def _local(self, model: str, base_url: str, system: str, messages: list, stream: bool) -> Generator:
-        url = f"{base_url.rstrip('/')}/v1/chat/completions"
-        payload = {
-            "model": model,
-            "stream": stream,
-            "messages": [{"role": "system", "content": system}] + messages,
-        }
-        try:
-            req = urllib.request.Request(
-                url,
-                data=json.dumps(payload).encode(),
-                headers={"Content-Type": "application/json"},
-            )
-            with urllib.request.urlopen(req, timeout=120) as resp:
-                for line in resp:
-                    line = line.decode().strip()
-                    if line.startswith("data:"):
-                        data = line[5:].strip()
-                        if data == "[DONE]":
-                            break
-                        try:
-                            chunk = json.loads(data)
-                            delta = chunk["choices"][0]["delta"].get("content", "")
-                            if delta:
-                                yield delta
-                        except Exception:
-                            pass
-        except Exception as e:
-            yield f"[Local API Error] Could not reach {base_url}: {e}"
-
     # ─── LOCAL (llama.cpp / any OpenAI-compatible server) ──────────────
     def _local(self, model: str, base_url: str, system: str, messages: list, stream: bool) -> Generator:
         url = f"{base_url.rstrip('/')}/v1/chat/completions"

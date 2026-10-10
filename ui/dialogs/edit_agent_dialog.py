@@ -143,14 +143,6 @@ class EditAgentDialog(QDialog):
         self.base_url_input.setText(self._current_base_url)
         layout.addWidget(self.base_url_input)
 
-        layout.addWidget(self._lbl("BASE URL (OPTIONAL)"))
-        self.base_url_input = QLineEdit()
-        self.base_url_input.setPlaceholderText(
-            "e.g. http://localhost:8080 — leave empty for default"
-        )
-        self.base_url_input.setText(self._current_base_url)
-        layout.addWidget(self.base_url_input)
-
         # ── Chrome Profile ─────────────────────────────────────────────
 
         layout.addWidget(self._lbl("CHROME PROFILE"))
