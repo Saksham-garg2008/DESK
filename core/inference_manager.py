@@ -8,12 +8,11 @@ import urllib.error
 from typing import Generator, Optional
 from core.config_loader import get_key, load_models_config
 
-
 RESPONSE_LENGTH_MAP = {
-    "concise":  "Reply in 1-3 sentences. Be direct and brief.",
-    "standard": "Reply in a balanced way. Not too long, not too short.",
-    "detailed": "Reply with thorough detail, examples where helpful.",
-    "full":     "Reply exhaustively. Cover all angles, leave nothing out.",
+    "concise":  "Reply in 1-3 sentences. Be direct and brief. ",
+    "standard": "Reply in a balanced way. Not too long, not too short. ",
+    "detailed": "Reply with thorough detail, examples where helpful. ",
+    "full":     "Reply exhaustively. Cover all angles, leave nothing out. ",
 }
 
 
@@ -29,6 +28,7 @@ class InferenceManager:
         messages: list[dict],
         response_length: str = "standard",
         stream: bool = True,
+        base_url: str = "",
     ) -> Generator[str, None, None]:
         """
         Route a chat request to the correct backend.
@@ -37,10 +37,23 @@ class InferenceManager:
         length_instruction = RESPONSE_LENGTH_MAP.get(response_length, "")
         full_system = f"{system_prompt}\n\n{length_instruction}".strip()
 
+        # ── Dynamic URL resolution ──────────────────────────────────
+        # Priority: 1) GUI field  2) model.json  3) Hardcoded fallback
+
+        if not base_url:
+            backend_cfg = self.models_config.get("backends", {}).get(backend, {})
+            base_url = backend_cfg.get("base_url", "")
+        if not base_url and backend == "ollama":
+            base_url = "http://localhost:11434"
+        if not base_url and backend == "local":
+            base_url = "http://localhost:8080"
+
         if backend == "ollama":
-            yield from self._ollama(model, full_system, messages, stream)
+            yield from self._ollama(model, base_url, full_system, messages, stream)
         elif backend == "openai":
             yield from self._openai(model, full_system, messages)
+        elif backend == "local":
+            yield from self._local(model, base_url, full_system, messages, stream)
         elif backend == "anthropic":
             yield from self._anthropic(model, full_system, messages)
         elif backend == "gemini":
@@ -56,8 +69,8 @@ class InferenceManager:
 
     # ─── OLLAMA (Local) ───────────────────────────────────────────────────────
 
-    def _ollama(self, model: str, system: str, messages: list, stream: bool) -> Generator:
-        url = "http://localhost:11434/api/chat"
+    def _ollama(self, model: str, base_url: str, system: str, messages: list, stream: bool) -> Generator:
+        url = f"{base_url.rstrip('/')}/api/chat"
         payload = {
             "model": model,
             "stream": stream,
@@ -79,10 +92,40 @@ class InferenceManager:
                         if chunk.get("done"):
                             break
         except Exception as e:
-            yield f"[Ollama Error] {e}"
+            yield f"[Ollama Error] Could not reach {base_url}: {e}"
 
-    # ─── OPENAI ───────────────────────────────────────────────────────────────
+    # ─── LOCAL (llama.cpp / any OpenAI-compatible server) ──────────────
+    def _local(self, model: str, base_url: str, system: str, messages: list, stream: bool) -> Generator:
+        url = f"{base_url.rstrip('/')}/v1/chat/completions"
+        payload = {
+            "model": model,
+            "stream": stream,
+            "messages": [{"role": "system", "content": system}] + messages,
+        }
+        try:
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode(),
+                headers={"Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                for line in resp:
+                    line = line.decode().strip()
+                    if line.startswith("data:"):
+                        data = line[5:].strip()
+                        if data == "[DONE]":
+                            break
+                        try:
+                            chunk = json.loads(data)
+                            delta = chunk["choices"][0]["delta"].get("content", "")
+                            if delta:
+                                yield delta
+                        except Exception:
+                            pass
+        except Exception as e:
+            yield f"[Local API Error] Could not reach {base_url}: {e}"
 
+    # ─── OPENAI ────────────────────────────────────────────────────────
     def _openai(self, model: str, system: str, messages: list) -> Generator:
         api_key = get_key("openai")
         if not api_key:
@@ -96,8 +139,7 @@ class InferenceManager:
         }
         yield from self._openai_compat_stream(url, payload, api_key)
 
-    # ─── ANTHROPIC ────────────────────────────────────────────────────────────
-
+    # ─── ANTHROPIC ─────────────────────────────────────────────────────
     def _anthropic(self, model: str, system: str, messages: list) -> Generator:
         api_key = get_key("anthropic")
         if not api_key:
@@ -137,8 +179,7 @@ class InferenceManager:
         except Exception as e:
             yield f"[Anthropic Error] {e}"
 
-    # ─── GEMINI ───────────────────────────────────────────────────────────────
-
+    # ─── GEMINI ────────────────────────────────────────────────────────
     def _gemini(self, model: str, system: str, messages: list) -> Generator:
         api_key = get_key("gemini")
         if not api_key:
@@ -200,8 +241,7 @@ class InferenceManager:
         except Exception as e:
             yield f"[Gemini Error] {e}"
 
-    # ─── MISTRAL ──────────────────────────────────────────────────────────────
-
+    # ─── MISTRAL ───────────────────────────────────────────────────────
     def _mistral(self, model: str, system: str, messages: list) -> Generator:
         api_key = get_key("mistral")
         if not api_key:
@@ -215,8 +255,7 @@ class InferenceManager:
         }
         yield from self._openai_compat_stream(url, payload, api_key)
 
-    # ─── GROQ ─────────────────────────────────────────────────────────────────
-
+    # ─── GROQ ──────────────────────────────────────────────────────────
     def _groq(self, model: str, system: str, messages: list) -> Generator:
         api_key = get_key("groq")
         if not api_key:
@@ -230,8 +269,7 @@ class InferenceManager:
         }
         yield from self._openai_compat_stream(url, payload, api_key)
 
-    # ─── OPENROUTER ───────────────────────────────────────────────────────────
-
+    # ─── OPENROUTER ────────────────────────────────────────────────────
     def _openrouter(self, model: str, system: str, messages: list) -> Generator:
         api_key = get_key("openrouter")
         if not api_key:
@@ -248,8 +286,7 @@ class InferenceManager:
             "X-Title": "DESK",
         })
 
-    # ─── SHARED: OpenAI-compatible SSE stream ─────────────────────────────────
-
+    # ─── SHARED: OpenAI-compatible SSE stream ──────────────────────────
     def _openai_compat_stream(
         self, url: str, payload: dict, api_key: str, extra_headers: dict = None
     ) -> Generator:

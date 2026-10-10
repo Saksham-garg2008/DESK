@@ -933,6 +933,7 @@ class ChatPanel(QWidget):
         )
         backend         = config.get("backend", "ollama")
         model           = config.get("model", "llama3.2:3b")
+        base_url        = config.get("base_url", "")
         response_length = config.get(
             "response_length", get_app_setting("response_length", "standard")
         )
@@ -981,7 +982,7 @@ class ChatPanel(QWidget):
         inference = InferenceManager()
         worker    = InferenceWorker(
             inference.chat, backend, model, system_prompt,
-            list(self.messages), response_length,
+            list(self.messages), response_length, True, base_url=base_url,
         )
         self._active_worker = worker
         worker.signals.chunk.connect(self._on_chunk)
@@ -1088,20 +1089,22 @@ class ChatPanel(QWidget):
             self.agent_name, existing_memory, recent
         )
 
-        mem_cfg = get_memory_agent_config()
-        backend = mem_cfg.get("backend") or ""
-        model = mem_cfg.get("model") or ""
+        mem_cfg  = get_memory_agent_config()
+        backend  = mem_cfg.get("backend") or ""
+        model    = mem_cfg.get("model") or ""
+        base_url = ""
         if not backend or not model:
             # Fall back to this agent's own backend/model
             agent_cfg = get_agent_config(self.agent_name)
-            backend = agent_cfg.get("backend", "ollama")
-            model = agent_cfg.get("model", "llama3.2:3b")
+            backend   = agent_cfg.get("backend", "ollama")
+            model     = agent_cfg.get("model", "llama3.2:3b")
+            base_url  = agent_cfg.get("base_url", "")
 
         inference = InferenceManager()
-        worker = InferenceWorker(
+        worker    = InferenceWorker(
             inference.chat, backend, model, system_prompt,
             [{"role": "user", "content": user_prompt}],
-            "standard",
+            "standard", True, base_url=base_url,
         )
         self._memory_worker = worker
         self._memory_buffer = ""
