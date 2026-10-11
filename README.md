@@ -12,6 +12,7 @@
   <img src="https://img.shields.io/badge/Python-3.x-blue?style=flat-square" alt="Python">
   <img src="https://img.shields.io/badge/PySide6-Desktop%20UI-blue?style=flat-square" alt="PySide6">
   <img src="https://img.shields.io/badge/Platforms-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey?style=flat-square" alt="Platforms">
+  [![License: GPL v2](https://img.shields.io/badge/License-GPL--2.0-blue.svg)](LICENSE)
 </p>
 
 ---
@@ -321,6 +322,18 @@ The **DESK Wiki** contains deeper technical documentation covering:
 Contributions, ideas, bug reports, and improvements are welcome.
 
 See **[CONTRIBUTING.md](CONTRIBUTING.md)** for contribution guidelines.
+
+---
+
+## License
+
+DESK is licensed under the **GNU General Public License v2.0 only (GPL-2.0-only)**.
+
+You are free to use, study, modify, and redistribute DESK in accordance with the terms and conditions of the license. When redistributing covered versions, you must comply with the applicable GPL-2.0 requirements.
+
+See the [LICENSE](LICENSE) file for the complete license text.
+
+**Official repository:** [Saksham-garg2008/DESK](https://github.com/Saksham-garg2008/DESK)
 
 ---
 
