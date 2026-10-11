@@ -11,8 +11,8 @@
   <a href="https://github.com/Saksham-garg2008/DESK/issues"><img src="https://img.shields.io/github/issues/Saksham-garg2008/DESK?style=flat-square" alt="GitHub Issues"></a>
   <img src="https://img.shields.io/badge/Python-3.x-blue?style=flat-square" alt="Python">
   <img src="https://img.shields.io/badge/PySide6-Desktop%20UI-blue?style=flat-square" alt="PySide6">
-  <img src="https://img.shields.io/badge/Platforms-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey?style=flat-square" alt="Platforms">
-  [![License: GPL v2](https://img.shields.io/badge/License-GPL--2.0-blue.svg)](LICENSE)
+  <img src="https://img.shields.io/badge/Release%20Builds-Windows%20%7C%20Linux-lightgrey?style=flat-square" alt="Release builds: Windows and   Linux">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--2.0-blue.svg" alt="License: GPL v2"></a>
 </p>
 
 ---
@@ -145,6 +145,7 @@ DESK
 ├── config/
 ├── bucket/
 ├── workspace/
+├── Companion/
 └── main.py
 ```
 
@@ -192,12 +193,12 @@ This keeps the agent protocol portable while allowing the execution layer to rem
 
 ## 📱 DESK Companion
 
-DESK is also being developed alongside an Android companion project.
+DESK includes Android Companion-related code in the [`Companion/`](Companion/) directory. The companion project also has a separate repository.
 
-**[DESK Companion](https://github.com/Saksham-garg2008/DESK-Companion)**
+- **Code within DESK:** [`Companion/`](Companion/)
+- **Android Companion repository:** [Saksham-garg2008/DESK-Companion](https://github.com/Saksham-garg2008/DESK-Companion)
 
-The desktop application remains the core DESK project, while the Android companion is maintained separately as its own repository.
-
+The desktop application remains the core DESK project. The `Companion/` directory contains related integration code, while the separate repository is dedicated to the Android Companion project.
 ---
 
 ## 🎨 Desktop Interface
