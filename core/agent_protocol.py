@@ -1,8 +1,10 @@
-"""
-Agent Protocol — Detects structured action requests in LLM responses.
 
-The model decides which action to request.
-DESK parses the request and passes it to the action executor.
+"""
+Agent Protocol — Extracts structured action requests from LLM responses.
+
+Supports:
+- Multiple actions inside <DESK_ACTIONS>
+- Existing single actions inside <DESK_ACTION>
 """
 
 from __future__ import annotations
@@ -11,52 +13,83 @@ import json
 import re
 
 
-ACTION_PATTERN = re.compile(
+MULTI_ACTION_PATTERN = re.compile(
+    r"<DESK_ACTIONS>\s*(\[.*?\])\s*</DESK_ACTIONS>",
+    re.DOTALL,
+)
+
+SINGLE_ACTION_PATTERN = re.compile(
     r"<DESK_ACTION>\s*(\{.*?\})\s*</DESK_ACTION>",
     re.DOTALL,
 )
 
 
-def extract_action(text: str) -> tuple[dict | None, str]:
+def extract_actions(text: str) -> tuple[list[dict], str]:
     """
-    Extract an action request from an LLM response.
+    Extract one or more actions and return the remaining visible text.
 
-    Expected model output:
+    Multi-action format:
+        <DESK_ACTIONS>
+        [
+            {"action": "open_application", "application": "Chrome"},
+            {"action": "open_application", "application": "File Manager"}
+        ]
+        </DESK_ACTIONS>
 
-        <DESK_ACTION>
-        {"action": "open_url", "url": "https://www.youtube.com"}
-        </DESK_ACTION>
-
-    Returns:
-
-        (action_dict, remaining_text)
-
-    If no action exists:
-
-        (None, original_text)
+    The previous single-action format remains supported.
     """
 
     if not text:
-        return None, text
+        return [], text
 
-    match = ACTION_PATTERN.search(text)
+    match = MULTI_ACTION_PATTERN.search(text)
+
+    if match:
+        try:
+            actions = json.loads(match.group(1).strip())
+        except json.JSONDecodeError:
+            return [], text
+
+        if (
+            not isinstance(actions, list)
+            or not actions
+            or not all(isinstance(action, dict) for action in actions)
+        ):
+            return [], text
+
+        remaining = (
+            text[:match.start()] + text[match.end():]
+        ).strip()
+
+        return actions, remaining
+
+    # Backward compatibility with the original single-action format.
+    match = SINGLE_ACTION_PATTERN.search(text)
 
     if not match:
-        return None, text
-
-    raw_json = match.group(1).strip()
+        return [], text
 
     try:
-        action = json.loads(raw_json)
+        action = json.loads(match.group(1).strip())
     except json.JSONDecodeError:
-        return None, text
+        return [], text
 
     if not isinstance(action, dict):
-        return None, text
+        return [], text
 
     remaining = (
-        text[:match.start()] +
-        text[match.end():]
+        text[:match.start()] + text[match.end():]
     ).strip()
 
-    return action, remaining
+    return [action], remaining
+
+
+def extract_action(text: str) -> tuple[dict | None, str]:
+    """Compatibility wrapper for callers expecting one action."""
+
+    actions, remaining = extract_actions(text)
+
+    if not actions:
+        return None, remaining
+
+    return actions[0], remaining

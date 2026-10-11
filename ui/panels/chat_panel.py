@@ -34,7 +34,7 @@ from core.memory_manager import (
 )
 
 from core.paths import BUCKET_DIR, IMAGES_DIR
-from core.agent_protocol import extract_action
+from core.agent_protocol import extract_actions
 from core.agent_actions import execute_action
 
 SUPPORTED_IMAGES = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
@@ -941,32 +941,41 @@ class ChatPanel(QWidget):
         if md_path.exists():
             system_prompt = md_path.read_text(encoding="utf-8")
 
+        
         system_prompt = (
             f"{system_prompt}\n\n"
             "--- DESK AGENTIC CAPABILITIES ---\n"
             "You are connected to DESK and may request local actions.\n\n"
 
-            "When the user asks you to open a website, request the action "
-            "using exactly this format:\n\n"
-            "<DESK_ACTION>\n"
-            '{"action": "open_url", "url": "https://example.com"}\n'
-            "</DESK_ACTION>\n\n"
+            "When the user requests one or more actions, put every "
+            "requested action into a single DESK_ACTIONS block.\n\n"
 
-            "When the user asks you to open an installed application, "
-            "request the action using exactly this format:\n\n"
-            "<DESK_ACTION>\n"
-            '{"action": "open_application", "application": "Telegram"}\n'
-            "</DESK_ACTION>\n\n"
+            "For a website, use this action object:\n"
+            '{"action": "open_url", "url": "https://example.com"}\n\n'
 
-            "For applications, provide only the human-readable application "
-            "name. Never provide an executable path, shell command, or "
-            "OS-specific launch instruction. DESK will find and launch "
-            "the application on the user's operating system.\n\n"
+            "For an installed application, use this action object:\n"
+            '{"action": "open_application", "application": "Chrome"}\n\n'
 
-            "Do not claim that an action was completed yourself. "
-            "DESK will execute the action and report the result.\n"
+            "For multiple actions, use this exact structure:\n"
+            "<DESK_ACTIONS>\n"
+            "[\n"
+            '  {"action": "open_application", "application": "Chrome"},\n'
+            '  {"action": "open_application", "application": "File Manager"}\n'
+            "]\n"
+            "</DESK_ACTIONS>\n\n"
+
+            "Include every requested action, in the order requested. "
+            "Do not omit actions just because there are multiple.\n"
+            "Use valid JSON: double quotes, no comments, and no trailing commas.\n"
+            "For applications, provide only the human-readable name. "
+            "Never provide executable paths, shell commands, or "
+            "OS-specific launch instructions.\n\n"
+
+            "Do not claim that an action has been completed yourself. "
+            "DESK will execute the requested actions and report the results.\n"
             "--- END DESK AGENTIC CAPABILITIES ---"
         ).strip()
+
 
         # ── Inject long-term memory, if any exists yet ──────────────
         agent_memory = load_memory(self.agent_name)
@@ -1001,34 +1010,55 @@ class ChatPanel(QWidget):
         self.send_btn.setEnabled(True)
         if self._current_response_widget:
             raw = self._current_response_widget.get_raw_text()
-            action, visible_text = extract_action(raw)
+            
+            actions, visible_text = extract_actions(raw)
 
-            if action:
-                try:
-                    result = execute_action(
-                        action,
-                        chrome_profile=self._chrome_profile,
-                    )
+            if actions:
+                results = []
 
-                    if action.get("action") == "open_url":
-                        visible_text = f"Opened {result}"
+                # Preserve any ordinary response text outside the action block.
+                if visible_text:
+                    results.append(visible_text)
 
-                    elif action.get("action") == "open_application":
-                        visible_text = f"Opened {result}"
+                # Execute each requested action independently.
+                for action in actions:
+                    action_name = action.get("action", "unknown action")
 
+                    if action_name == "open_application":
+                        target = action.get("application", "application")
+                    elif action_name == "open_url":
+                        target = action.get("url", "website")
                     else:
-                        visible_text = f"Completed action: {result}"
+                        target = action_name
 
-                except Exception as e:
-                    visible_text = (
-                        f"Could not complete the action: {e}"
-                    )
+                    try:
+                        result = execute_action(
+                            action,
+                            chrome_profile=self._chrome_profile,
+                        )
+
+                        if action_name == "open_url":
+                            results.append(f"Opened website: {result}")
+
+                        elif action_name == "open_application":
+                            results.append(f"Opened application: {result}")
+
+                        else:
+                            results.append(f"Completed action: {result}")
+
+                    except Exception as e:
+                        results.append(
+                            f"Could not complete '{target}': {e}"
+                        )
+
+                visible_text = "\n".join(results)
 
                 self._current_response_widget._raw_text = visible_text
                 self._current_response_widget.label.setText(
                     markdown_to_html(visible_text)
                 )
                 raw = visible_text
+
             self.messages.append({"role": "assistant", "content": raw})
 
             # ── Parse artifacts from response ──────────────────────────
