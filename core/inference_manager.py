@@ -109,19 +109,31 @@ class InferenceManager:
                 headers={"Content-Type": "application/json"},
             )
             with urllib.request.urlopen(req, timeout=120) as resp:
-                for line in resp:
-                    line = line.decode().strip()
-                    if line.startswith("data:"):
-                        data = line[5:].strip()
-                        if data == "[DONE]":
-                            break
-                        try:
-                            chunk = json.loads(data)
-                            delta = chunk["choices"][0]["delta"].get("content", "")
-                            if delta:
-                                yield delta
-                        except Exception:
-                            pass
+                if not stream:
+                    # ─ Non-streaming: Parse standard JSON response ─
+                    body = resp.read().decode()
+                    try:
+                        data = json.loads(body)
+                        content = data["choices"][0]["message"]["content"]
+                        if content:
+                            yield content
+                    except (KeyError, IndexError, json.JSONDecodeError) as e:
+                        yield f"[Local API Error] Invalid JSON response: {e}"
+                else:
+                    # ── Streaming: Parse SSE data: lines ──
+                    for line in resp:
+                        line = line.decode().strip()
+                        if line.startswith("data:"):
+                            data = line[5:].strip()
+                            if data == "[DONE]":
+                                break
+                            try:
+                                chunk = json.loads(data)
+                                delta = chunk["choices"][0]["delta"].get("content", "")
+                                if delta:
+                                    yield delta
+                            except Exception:
+                                pass
         except Exception as e:
             yield f"[Local API Error] Could not reach {base_url}: {e}"
 
