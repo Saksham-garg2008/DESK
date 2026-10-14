@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QLabel, QTextEdit, QPushButton, QSizePolicy,
     QFileDialog, QDialog, QApplication
 )
-from PySide6.QtCore import Qt, Signal, QTimer
+from PySide6.QtCore import Qt, Signal, QTimer, QThread
 from PySide6.QtGui import QKeyEvent, QDragEnterEvent, QDropEvent, QPixmap
 
 from core.inference_manager import InferenceManager
@@ -688,6 +688,61 @@ class SmartInput(QTextEdit):
             super().keyPressEvent(event)
 
 
+# ── Background action worker ──────────────────────────────────────────────────
+
+class ActionWorker(QThread):
+    """Execute a batch of agent actions without blocking the chat UI.
+
+    Actions are processed in order, and each failure is recorded without
+    preventing later actions from running.
+    """
+    actions_completed = Signal(str)
+
+    def __init__(self, actions: list[dict], initial_text: str,
+                 chrome_profile: str | None, parent=None):
+        super().__init__(parent)
+        self.actions = actions
+        self.initial_text = initial_text
+        self.chrome_profile = chrome_profile
+
+    def run(self):
+        results = []
+        if self.initial_text:
+            results.append(self.initial_text)
+
+        for action in self.actions:
+            action_name = action.get("action", "unknown action")
+
+            if action_name == "open_application":
+                target = action.get("application", "application")
+            elif action_name == "open_url":
+                target = action.get("url", "website")
+            elif action_name == "search_filesystem":
+                target = action.get("name", "file")
+            else:
+                target = action_name
+
+            try:
+                result = execute_action(
+                    action,
+                    chrome_profile=self.chrome_profile,
+                )
+
+                if action_name == "open_url":
+                    results.append(f"Opened website: {result}")
+                elif action_name == "open_application":
+                    results.append(f"Opened application: {result}")
+                elif action_name == "search_filesystem":
+                    results.append(result)
+                else:
+                    results.append(f"Completed action: {result}")
+
+            except Exception as exc:
+                results.append(f"Could not complete '{target}': {exc}")
+
+        self.actions_completed.emit("\n".join(results))
+
+
 # ── Chat Panel ────────────────────────────────────────────────────────────────
 
 class ChatPanel(QWidget):
@@ -704,6 +759,7 @@ class ChatPanel(QWidget):
         self._attachment_chips:   list[AttachmentChip] = []
         self._current_response_widget: MessageWidget | None = None
         self._active_worker = None
+        self._action_worker = None
         # ── Memory distillation state ───────────────────────────────
         self._exchanges_since_distill = 0
         self._memory_worker = None
@@ -1020,63 +1076,66 @@ class ChatPanel(QWidget):
             self._scroll_to_bottom()
 
     def _on_done(self):
-        self.send_btn.setEnabled(True)
+        if not self._current_response_widget:
+            self.send_btn.setEnabled(True)
+            self._active_worker = None
+            return
+
+        raw = self._current_response_widget.get_raw_text()
+        actions, visible_text = extract_actions(raw)
+
+        if not actions:
+            self._finish_response(raw)
+            return
+
+        # Filesystem search and all other requested actions run off the UI
+        # thread. Keep the Send button disabled until the whole batch ends.
+        worker = ActionWorker(
+            actions=actions,
+            initial_text=visible_text,
+            chrome_profile=getattr(self, "_chrome_profile", None),
+            parent=self,
+        )
+        self._action_worker = worker
+        worker.actions_completed.connect(self._on_actions_completed)
+        worker.finished.connect(self._on_action_worker_finished)
+
+        # Hide the raw action protocol while the requested work is running.
+        progress_text = visible_text
+        if progress_text:
+            progress_text += "\n\nExecuting requested actions…"
+        else:
+            progress_text = "Executing requested actions…"
+        self._current_response_widget._raw_text = progress_text
+        self._current_response_widget.label.setText(
+            markdown_to_html(progress_text)
+        )
+
+        self.send_btn.setEnabled(False)
+        worker.start()
+
+    def _on_actions_completed(self, visible_text: str):
         if self._current_response_widget:
-            raw = self._current_response_widget.get_raw_text()
-            
-            actions, visible_text = extract_actions(raw)
+            self._current_response_widget._raw_text = visible_text
+            self._current_response_widget.label.setText(
+                markdown_to_html(visible_text)
+            )
+            self._finish_response(visible_text)
+        else:
+            self.send_btn.setEnabled(True)
+            self._active_worker = None
 
-            if actions:
-                results = []
+    def _on_action_worker_finished(self):
+        # Keep the QThread referenced until Qt confirms that it has stopped,
+        # then schedule the QObject for cleanup.
+        worker = self._action_worker
+        self._action_worker = None
+        if worker is not None:
+            worker.deleteLater()
 
-                # Preserve any ordinary response text outside the action block.
-                if visible_text:
-                    results.append(visible_text)
-
-                # Execute each requested action independently.
-                for action in actions:
-                    action_name = action.get("action", "unknown action")
-
-                    if action_name == "open_application":
-                        target = action.get("application", "application")
-                    elif action_name == "open_url":
-                        target = action.get("url", "website")
-                    elif action_name == "search_filesystem":
-                        target = action.get("name", "file")
-                    else:
-                        target = action_name
-
-                    try:
-                        result = execute_action(
-                            action,
-                            chrome_profile=self._chrome_profile,
-                        )
-
-                        if action_name == "open_url":
-                            results.append(f"Opened website: {result}")
-
-                        elif action_name == "open_application":
-                            results.append(f"Opened application: {result}")
-
-                        elif action_name == "search_filesystem":
-                            results.append(result)
-
-                        else:
-                            results.append(f"Completed action: {result}")
-
-                    except Exception as e:
-                        results.append(
-                            f"Could not complete '{target}': {e}"
-                        )
-
-                visible_text = "\n".join(results)
-
-                self._current_response_widget._raw_text = visible_text
-                self._current_response_widget.label.setText(
-                    markdown_to_html(visible_text)
-                )
-                raw = visible_text
-
+    def _finish_response(self, raw: str):
+        """Finalize an assistant response after inference/actions complete."""
+        if self._current_response_widget:
             self.messages.append({"role": "assistant", "content": raw})
 
             # ── Parse artifacts from response ──────────────────────────
@@ -1098,6 +1157,7 @@ class ChatPanel(QWidget):
 
         self._current_response_widget = None
         self._active_worker = None
+        self.send_btn.setEnabled(True)
         self._save_history()
 
         # ── Memory distillation trigger ─────────────────────────────
