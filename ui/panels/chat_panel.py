@@ -956,6 +956,19 @@ class ChatPanel(QWidget):
             "For an installed application, use this action object:\n"
             '{"action": "open_application", "application": "Chrome"}\n\n'
 
+            "To search for a file by its filename, use this action object:\n"
+            '{"action": "search_filesystem", "name": "batman.png"}\n\n'
+
+            "For a partial filename search, you may use:\n"
+            '{"action": "search_filesystem", "name": "batman", '
+            '"partial_match": true}\n\n'
+
+            "Filesystem search rules:\n"
+            "- Search by filename only, not by file contents.\n"
+            "- Never provide a root, directory, drive, or filesystem path.\n"
+            "- DESK determines the allowed search roots automatically.\n"
+            "- Do not invent paths or claim results before DESK returns them.\n\n"
+
             "For multiple actions, use this exact structure:\n"
             "<DESK_ACTIONS>\n"
             "[\n"
@@ -1028,6 +1041,8 @@ class ChatPanel(QWidget):
                         target = action.get("application", "application")
                     elif action_name == "open_url":
                         target = action.get("url", "website")
+                    elif action_name == "search_filesystem":
+                        target = action.get("name", "file")
                     else:
                         target = action_name
 
@@ -1042,6 +1057,9 @@ class ChatPanel(QWidget):
 
                         elif action_name == "open_application":
                             results.append(f"Opened application: {result}")
+
+                        elif action_name == "search_filesystem":
+                            results.append(result)
 
                         else:
                             results.append(f"Completed action: {result}")
