@@ -317,6 +317,92 @@ def _search_filesystem_action(action: dict) -> str:
         )
 
     return "\n".join(lines)
+    
+
+def _create_folder_action(action: dict) -> str:
+    """Create a folder and any missing parent directories."""
+
+    folder_path = action.get("path")
+
+    if not isinstance(folder_path, str) or not folder_path.strip():
+        raise ValueError("A folder path is required.")
+
+    path = Path(folder_path.strip()).expanduser()
+
+    if not path.is_absolute():
+        raise ValueError(
+            "Please provide an absolute folder path, "
+            "or use a path beginning with ~/."
+        )
+
+    if path == path.parent:
+        raise ValueError("The filesystem root cannot be used as a folder.")
+
+    if path.exists():
+        if path.is_dir():
+            return f"Folder already exists: {path}"
+
+        raise ValueError(
+            f"Cannot create folder '{path}': a file already exists there."
+        )
+
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise RuntimeError(
+            f"Could not create folder '{path}': {exc}"
+        ) from exc
+
+    if not path.is_dir():
+        raise RuntimeError(f"The folder could not be created: {path}")
+
+    return f"Created folder: {path}"
+
+
+
+def _create_file_action(action: dict) -> str:
+    """Create a text file and any missing parent directories."""
+
+    file_path = action.get("path")
+    content = action.get("content")
+
+    if not isinstance(file_path, str) or not file_path.strip():
+        raise ValueError("A file path is required.")
+
+    if not isinstance(content, str):
+        raise ValueError("File content must be text.")
+
+    # Expand paths such as ~/Desktop/project/main.py.
+    path = Path(file_path.strip()).expanduser()
+
+    if not path.is_absolute():
+        raise ValueError(
+            "Please provide an absolute file path, "
+            "or use a path beginning with ~/."
+        )
+
+    if not path.name:
+        raise ValueError("The path must include a filename.")
+
+    try:
+        # Create the project's parent folders if necessary.
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Exclusive creation: never overwrite an existing file.
+        with path.open("x", encoding="utf-8", newline="") as file:
+            file.write(content)
+
+    except FileExistsError:
+        raise ValueError(
+            f"Cannot create '{path}': the file already exists. "
+            "Choose another filename to avoid overwriting it."
+        ) from None
+    except OSError as exc:
+        raise RuntimeError(
+            f"Could not create '{path}': {exc}"
+        ) from exc
+
+    return f"Created file: {path}"
 
 
 def execute_action(
@@ -340,6 +426,14 @@ def execute_action(
 
     if action_name == "search_filesystem":
         return _search_filesystem_action(action)
+      
+    
+    if action_name == "create_file":
+        return _create_file_action(action)
+        
+    if action_name == "create_folder":
+        return _create_folder_action(action)
+
 
     raise ValueError(f"Unknown agent action: {action_name}")
 

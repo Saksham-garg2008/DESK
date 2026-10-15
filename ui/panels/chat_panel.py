@@ -1024,6 +1024,42 @@ class ChatPanel(QWidget):
             "- Never provide a root, directory, drive, or filesystem path.\n"
             "- DESK determines the allowed search roots automatically.\n"
             "- Do not invent paths or claim results before DESK returns them.\n\n"
+            
+            
+            "To create a text file, use this action object:\n"
+            '{"action": "create_file", '
+            '"path": "~/Desktop/MyProject/README.md", '
+            '"content": "# MyProject\\n\\nProject documentation goes here.\\n"}\n\n'
+
+            "File creation rules:\n"
+            "- Use the destination requested by the user. Paths may use "
+            "an absolute path or begin with ~/.\n"
+            "- Provide the complete file contents in the content field.\n"
+            "- Use valid JSON string escaping, including \\n for line breaks "
+            "and escaped quotes where necessary.\n"
+            "- When creating multiple files, include one create_file action "
+            "per file in the same DESK_ACTIONS array.\n"
+            "- Do not request overwriting existing files. If creation fails, "
+            "let DESK report the failure.\n"
+            "- Create only files and folders relevant to the user's request.\n"
+            "- Never claim a file was created until DESK reports success.\n\n"
+            
+            
+            "To create a folder, use this action object:\n"
+            '{"action": "create_folder", '
+            '"path": "~/Desktop/MyProject/Assets"}\n\n'
+
+            "Folder creation rules:\n"
+            "- Use the destination requested by the user. Paths may use "
+            "an absolute path or begin with ~/.\n"
+            "- Use create_folder for folders, including empty folders.\n"
+            "- Use create_file for files and include their complete contents.\n"
+            "- When creating a project structure, include an action for "
+            "every requested folder and file in the same DESK_ACTIONS array.\n"
+            "- Do not omit empty folders just because they contain no files.\n"
+            "- Never claim a folder was created until DESK reports the result.\n\n"
+
+
 
             "For multiple actions, use this exact structure:\n"
             "<DESK_ACTIONS>\n"
