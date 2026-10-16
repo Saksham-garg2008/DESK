@@ -22,6 +22,28 @@
         {"id": "custom", "label": "Custom Model...", "free": true, "notes": "Enter model name manually"}
       ]
     },
+    "local": {
+      "label": "Local",
+      "type": "local",
+      "base_url": "http://localhost:8080",
+      "models": [
+                {"id": "llama3.2:3b", "label": "Llama 3.2 3B", "free": true, "notes": "Fast, lightweight"},
+        {"id": "llama3.2:8b", "label": "Llama 3.2 8B", "free": true, "notes": "Balanced"},
+        {"id": "llama3.1:8b", "label": "Llama 3.1 8B", "free": true, "notes": "Solid reasoning"},
+        {"id": "llama3.1:70b", "label": "Llama 3.1 70B", "free": true, "notes": "Requires high RAM"},
+        {"id": "qwen2.5:3b", "label": "Qwen 2.5 3B", "free": true, "notes": "Great for coding"},
+        {"id": "qwen2.5:7b", "label": "Qwen 2.5 7B", "free": true, "notes": "Strong coder"},
+        {"id": "qwen2.5:14b", "label": "Qwen 2.5 14B", "free": true, "notes": "Powerful coder"},
+        {"id": "qwen2.5-coder:7b", "label": "Qwen 2.5 Coder 7B", "free": true, "notes": "Code specialist"},
+        {"id": "mistral:7b", "label": "Mistral 7B", "free": true, "notes": "Fast & capable"},
+        {"id": "gemma3:4b", "label": "Gemma 3 4B", "free": true, "notes": "Google model"},
+        {"id": "gemma3:12b", "label": "Gemma 3 12B", "free": true, "notes": "Strong Google model"},
+        {"id": "phi4:14b", "label": "Phi-4 14B", "free": true, "notes": "Microsoft reasoning"},
+        {"id": "deepseek-r1:7b", "label": "DeepSeek R1 7B", "free": true, "notes": "Strong reasoning"},
+        {"id": "deepseek-r1:14b", "label": "DeepSeek R1 14B", "free": true, "notes": "Deep reasoning"},
+        {"id": "custom", "label": "Custom Model...", "free": true, "notes": "Enter model name manually"}
+      ]
+    },
     "openai": {
       "label": "OpenAI",
       "type": "cloud",

@@ -405,16 +405,18 @@ class MemoryPanel(QWidget):
         mem_cfg = get_memory_agent_config()
         backend = mem_cfg.get("backend") or ""
         model = mem_cfg.get("model") or ""
+        base_url = ""
         if not backend or not model:
             agent_cfg = get_agent_config(agent_name)
             backend = agent_cfg.get("backend", "ollama")
             model = agent_cfg.get("model", "llama3.2:3b")
+            base_url = agent_cfg.get("base_url", "")
 
         inference = InferenceManager()
         worker = InferenceWorker(
             inference.chat, backend, model, system_prompt,
             [{"role": "user", "content": user_prompt}],
-            "standard",
+            "standard", True, base_url=base_url,
         )
         self._regen_worker = worker
         self._regen_buffer = ""
