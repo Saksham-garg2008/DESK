@@ -495,16 +495,16 @@ class MessageWidget(QWidget):
             self.label.setTextFormat(Qt.PlainText)
             self.label.setText(text)
             self.label.setStyleSheet("""
-                background-color: #2C2C34;
-                border-radius: 14px;
-                padding: 10px 16px;
+                background-color: transparent;
+                border: none;
+                padding: 2px 0;
                 color: #E2E2E2;
                 font-size: 13px;
             """)
-            self.label.setMaximumWidth(520)
+            self.label.setMaximumWidth(1000)
             col.addWidget(self.label)
-            outer.addStretch(1)
             outer.addLayout(col)
+            outer.addStretch(1)
         else:
             # Agent message — label used during streaming only.
             # After streaming, _finalize_display() rebuilds with segments.
@@ -519,7 +519,7 @@ class MessageWidget(QWidget):
                 font-size: 13px;
                 line-height: 1.7;
             """)
-            self.label.setMaximumWidth(680)
+            self.label.setMaximumWidth(1000)
             col.addWidget(self.label)
 
             # Container for finalized segmented content (replaces label after streaming)
@@ -627,7 +627,7 @@ class MessageWidget(QWidget):
                     font-size: 13px;
                     line-height: 1.7;
                 """)
-                lbl.setMaximumWidth(680)
+                lbl.setMaximumWidth(1000)
                 self._segments_layout.addWidget(lbl)
 
             elif seg["type"] == "code":
