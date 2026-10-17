@@ -557,14 +557,46 @@ class MessageWidget(QWidget):
 
             outer.addLayout(col, 1)
             
-            separator = QWidget()
-            separator.setFixedHeight(2 if not is_user else 1)
-            separator.setStyleSheet(
-                f"background-color: "
-				f"{'#45454D' if not is_user else '#2B2B30'};"
-			)
-            col.addWidget(separator)
         col.insertWidget(0, speaker)
+
+        # Copy button for the complete message
+        copy_btn = QPushButton("Copy")
+        copy_btn.setCursor(Qt.PointingHandCursor)
+        copy_btn.setFixedSize(48, 24)
+        copy_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                border: none;
+                color: #777D89;
+                font-size: 11px;
+                text-align: left;
+            }
+            QPushButton:hover {
+                color: #E2E2E2;
+            }
+        """)
+        copy_btn.setToolTip("Copy complete message")
+        copy_btn.clicked.connect(
+            lambda checked=False: QApplication.clipboard().setText(
+                self.get_raw_text()
+            )
+        )
+            
+        copy_row = QHBoxLayout()
+        copy_row.setContentsMargins(0, 2, 0, 0)
+        copy_row.addWidget(copy_btn)
+        copy_row.addStretch(1)
+        col.addLayout(copy_row)
+            
+        # Separator closes the message block
+        separator = QWidget()
+        separator.setFixedHeight(2 if not is_user else 1)
+        separator.setStyleSheet(
+            f"background-color: "
+            f"{'#45454D' if not is_user else '#2B2B30'};"
+        )
+        col.addWidget(separator)
+
 
         # Store col ref for finalize
         self._col = col
