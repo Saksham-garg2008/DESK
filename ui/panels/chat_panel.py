@@ -465,6 +465,18 @@ class MessageWidget(QWidget):
 
         col = QVBoxLayout()
         col.setSpacing(6)
+        
+        speaker = QLabel(
+            "YOU" if is_user else (agent_name or "DESK")
+        )
+        speaker.setStyleSheet(f"""
+            color: {"#8DB8FF" if is_user else "#82D9A0"};
+            font-family: monospace;
+            font-size: 11px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            padding: 2px 0;
+        """)
 
         if attachments:
             for att in attachments:
@@ -501,9 +513,9 @@ class MessageWidget(QWidget):
                 color: #E2E2E2;
                 font-size: 13px;
             """)
-            self.label.setMaximumWidth(1000)
+            self.label.setMaximumWidth(16777215)
             col.addWidget(self.label)
-            outer.addLayout(col)
+            outer.addLayout(col, 1)
             outer.addStretch(1)
         else:
             # Agent message — label used during streaming only.
@@ -519,7 +531,7 @@ class MessageWidget(QWidget):
                 font-size: 13px;
                 line-height: 1.7;
             """)
-            self.label.setMaximumWidth(1000)
+            self.label.setMaximumWidth(16777215)
             col.addWidget(self.label)
 
             # Container for finalized segmented content (replaces label after streaming)
@@ -543,8 +555,16 @@ class MessageWidget(QWidget):
             if self._artifact_chips_data:
                 self._show_artifact_chips(self._artifact_chips_data)
 
-            outer.addLayout(col)
-            outer.addStretch(1)
+            outer.addLayout(col, 1)
+            
+            separator = QWidget()
+            separator.setFixedHeight(2 if not is_user else 1)
+            separator.setStyleSheet(
+                f"background-color: "
+				f"{'#45454D' if not is_user else '#2B2B30'};"
+			)
+            col.addWidget(separator)
+        col.insertWidget(0, speaker)
 
         # Store col ref for finalize
         self._col = col
@@ -627,7 +647,7 @@ class MessageWidget(QWidget):
                     font-size: 13px;
                     line-height: 1.7;
                 """)
-                lbl.setMaximumWidth(1000)
+                lbl.setMaximumWidth(16777215)
                 self._segments_layout.addWidget(lbl)
 
             elif seg["type"] == "code":
