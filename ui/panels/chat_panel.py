@@ -36,6 +36,7 @@ from core.memory_manager import (
 from core.paths import BUCKET_DIR, IMAGES_DIR
 from core.agent_protocol import extract_actions
 from core.agent_actions import execute_action
+from ui.widgets.inline_code_block import InlineCodeBlock as ScrollableInlineCodeBlock
 
 SUPPORTED_IMAGES = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 SUPPORTED_DOCS   = {".pdf", ".txt", ".md", ".csv", ".json", ".py",
@@ -122,6 +123,43 @@ def split_text_and_code_blocks(text: str) -> list[dict]:
     after = text[last_end:].strip()
     if after:
         segments.append({"type": "text", "content": after})
+    return segments
+
+def split_text_and_inline_blocks(text: str) -> list[dict]:
+    """
+    Split text around explicit <inline>...</inline> blocks.
+
+    Returns:
+    - {"type": "text", "content": "..."}
+    - {"type": "inline", "content": "..."}
+    """
+    pattern = re.compile(r"<inline>(.*?)</inline>", re.DOTALL | re.IGNORECASE)
+
+    segments = []
+    last_end = 0
+
+    for match in pattern.finditer(text):
+        before = text[last_end:match.start()]
+        if before:
+            segments.append({
+                "type": "text",
+                "content": before,
+            })
+
+        segments.append({
+            "type": "inline",
+            "content": match.group(1).strip("\n"),
+        })
+
+        last_end = match.end()
+
+    after = text[last_end:]
+    if after:
+        segments.append({
+            "type": "text",
+            "content": after,
+        })
+
     return segments
 
 
@@ -656,61 +694,83 @@ class MessageWidget(QWidget):
         # While streaming, the finalized copy text is not available yet.
         return self._raw_text
 
+    
     def finalize_display(self, artifact_filenames: set[str], artifact_chips: list[tuple]):
         """
-        Called once streaming is done.
-        - Strips artifact code blocks from display text
-        - Renders remaining text + any non-artifact code blocks as inline widgets
-        - Shows artifact chips
+        Finalize an agent response:
+        - Render ordinary text as Markdown.
+        - Render explicit <inline> blocks with the scrollable code widget.
+        - Render non-artifact fenced code with the existing code widget.
+        - Replace artifact code with artifact chips.
+        - Keep hidden artifact source and inline tags out of message Copy.
         """
         if self._is_user:
             return
 
         raw = self._raw_text
 
-        # Build segments: split text around ALL code blocks
-        CODE_RE = re.compile(r"```(\w*)\n?(.*?)```", re.DOTALL)
+        # Match fenced code blocks and explicit inline blocks as separate segments.
+        # Fenced blocks are matched first so inline-like text inside a fenced block
+        # is not interpreted as an explicit inline block.
+        segment_re = re.compile(
+            r"(?P<code>```(\w*)\n?(.*?)```)"
+            r"|(?P<inline><inline>(.*?)</inline>)",
+            re.DOTALL | re.IGNORECASE,
+        )
+
         segments = []
         last_end = 0
 
-        for m in CODE_RE.finditer(raw):
-            before = raw[last_end:m.start()].strip()
+        for match in segment_re.finditer(raw):
+            before = raw[last_end:match.start()].strip()
             if before:
                 segments.append({"type": "text", "content": before})
 
-            lang = m.group(1).strip().lower()
-            code = m.group(2)
+            if match.group("code") is not None:
+                lang = (match.group(2) or "").strip().lower()
+                code = match.group(3) or ""
 
-            # Determine if this block is an artifact
-            is_artifact = _code_matches_any_artifact(
-                code, self._agent_name, artifact_filenames
-            )
+                is_artifact = _code_matches_any_artifact(
+                    code, self._agent_name, artifact_filenames
+                )
 
-            if is_artifact:
-                segments.append({"type": "artifact_placeholder"})
+                if is_artifact:
+                    segments.append({"type": "artifact_placeholder"})
+                elif code.strip():
+                    segments.append({
+                        "type": "code",
+                        "lang": lang,
+                        "content": code,
+                    })
+
             else:
-                # Non-artifact: show inline with copy button
-                if code.strip():
-                    segments.append({"type": "code", "lang": lang, "content": code})
+                inline_content = match.group(5) or ""
+                segments.append({
+                    "type": "inline",
+                    "content": inline_content.strip("\n"),
+                })
 
-            last_end = m.end()
+            last_end = match.end()
 
         after = raw[last_end:].strip()
         if after:
             segments.append({"type": "text", "content": after})
 
-		# Build copy text from visible segments only.
-		# Artifact placeholders are deliberately excluded.
+        # Build message Copy content from visible segments only.
+        # Explicit inline tags are removed; their contents remain copyable.
+        # Artifact source is excluded.
         copy_parts = []
 
         for seg in segments:
             if seg["type"] == "text":
                 copy_parts.append(seg["content"])
 
+            elif seg["type"] == "inline":
+                copy_parts.append(seg["content"])
+
             elif seg["type"] == "code":
                 lang = seg["lang"]
                 code = seg["content"]
-
                 if lang:
                     copy_parts.append(f"```{lang}\n{code}\n```")
                 else:
@@ -718,16 +778,18 @@ class MessageWidget(QWidget):
 
         self._copy_text = "\n\n".join(copy_parts)
 
-		# Hide streaming label
+        # Hide the temporary streaming label.
         self.label.setVisible(False)
 
-        # Build segmented display
+        # Render each segment in its original order.
         artifact_chip_iter = iter(artifact_chips)
+
         for seg in segments:
             if seg["type"] == "text":
                 txt = seg["content"]
                 if not txt:
                     continue
+
                 lbl = QLabel()
                 lbl.setWordWrap(True)
                 lbl.setTextInteractionFlags(
@@ -745,16 +807,20 @@ class MessageWidget(QWidget):
                 lbl.setMaximumWidth(16777215)
                 self._segments_layout.addWidget(lbl)
 
+            elif seg["type"] == "inline":
+                block = ScrollableInlineCodeBlock(seg["content"])
+                self._segments_layout.addWidget(block)
+
             elif seg["type"] == "code":
                 block = InlineCodeBlock(seg["content"], seg["lang"])
                 self._segments_layout.addWidget(block)
 
             elif seg["type"] == "artifact_placeholder":
-                # Insert the next artifact chip inline
                 try:
                     agent_name, filename, version = next(artifact_chip_iter)
                     chip = ArtifactChip(agent_name, filename, version)
                     chip.open_requested.connect(self.artifact_open_requested)
+
                     chip_row = QWidget()
                     chip_row_layout = QHBoxLayout(chip_row)
                     chip_row_layout.setContentsMargins(0, 0, 0, 0)
@@ -767,10 +833,11 @@ class MessageWidget(QWidget):
 
         self._segments_container.setVisible(True)
 
-        # Any remaining chips not placed inline go in the chips row
+        # Put any chips that could not be placed inline in the fallback row.
         remaining = list(artifact_chip_iter)
         if remaining:
             self._show_artifact_chips(remaining)
+
 
     def show_artifact_chips(self, chips: list[tuple]):
         """Fallback — add artifact chips to the chips row."""
@@ -1453,8 +1520,8 @@ class ChatPanel(QWidget):
                 chips = _matching_artifact_chips(content, self.agent_name)
                 artifact_filenames = {fname for _, fname, _ in chips}
 
-                if artifact_filenames:
-                    widget.finalize_display(artifact_filenames, chips)
+                widget._raw_text = content
+                widget.finalize_display(artifact_filenames, chips)
 
                 self.messages.append(msg)
 
