@@ -323,6 +323,42 @@ class ArtifactChip(QWidget):
             self.open_requested.emit(self.agent_name, self.filename)
 
 
+def _matching_artifact_chips(
+    text: str, agent_name: str
+) -> list[tuple[str, str, int]]:
+    """Find saved artifacts represented by code blocks in a response."""
+    from core.artifact_manager import ArtifactManager, _hash
+
+    am = ArtifactManager()
+    artifacts = am.get_agent_artifacts(agent_name)
+    code_re = re.compile(r"```(\w*)\n?(.*?)```", re.DOTALL)
+    chips = []
+
+    for match in code_re.finditer(text):
+        code = match.group(2)
+        if not code.strip():
+            continue
+
+        code_hash = _hash(code)
+
+        for filename, artifact in artifacts.items():
+            matched_version = next(
+                (
+                    version
+                    for version in artifact.get("versions", [])
+                    if _hash(version.get("content", "")) == code_hash
+                ),
+                None,
+            )
+            if matched_version:
+                chips.append(
+                    (agent_name, filename, matched_version["v"])
+                )
+                break
+
+    return chips
+
+
 def _code_matches_any_artifact(
     code: str, agent_name: str, artifact_filenames: set[str]
 ) -> bool:
@@ -456,6 +492,7 @@ class MessageWidget(QWidget):
         super().__init__(parent)
         self._is_user = is_user
         self._raw_text = ""
+        self._copy_text = None
         self._agent_name = agent_name
         self._artifact_chips_data = artifact_chips or []
 
@@ -610,7 +647,14 @@ class MessageWidget(QWidget):
             self.label.setText(markdown_to_html(self._raw_text))
 
     def get_raw_text(self) -> str:
-        return self._raw_text if not self._is_user else self.label.text()
+        if self._is_user:
+            return self.label.text()
+
+        if self._copy_text is not None:
+            return self._copy_text
+
+        # While streaming, the finalized copy text is not available yet.
+        return self._raw_text
 
     def finalize_display(self, artifact_filenames: set[str], artifact_chips: list[tuple]):
         """
@@ -655,7 +699,26 @@ class MessageWidget(QWidget):
         if after:
             segments.append({"type": "text", "content": after})
 
-        # Hide streaming label
+		# Build copy text from visible segments only.
+		# Artifact placeholders are deliberately excluded.
+        copy_parts = []
+
+        for seg in segments:
+            if seg["type"] == "text":
+                copy_parts.append(seg["content"])
+
+            elif seg["type"] == "code":
+                lang = seg["lang"]
+                code = seg["content"]
+
+                if lang:
+                    copy_parts.append(f"```{lang}\n{code}\n```")
+                else:
+                    copy_parts.append(f"```\n{code}\n```")
+
+        self._copy_text = "\n\n".join(copy_parts)
+
+		# Hide streaming label
         self.label.setVisible(False)
 
         # Build segmented display
@@ -1230,9 +1293,9 @@ class ChatPanel(QWidget):
             am = ArtifactManager()
             created = am.parse_and_save_artifacts(self.agent_name, raw)
 
-            # Build chip tuples and filename set
-            chips = [(self.agent_name, fname, ver) for fname, ver in created]
-            artifact_filenames = {fname for fname, _ in created}
+            # Match against all saved artifacts, including unchanged versions.
+            chips = _matching_artifact_chips(raw, self.agent_name)
+            artifact_filenames = {fname for _, fname, _ in chips}
 
             # Finalize display: suppress artifact code blocks,
             # show inline copy-button for non-artifact blocks, place chips
@@ -1361,24 +1424,40 @@ class ChatPanel(QWidget):
 
     # ── History ───────────────────────────────────────────────────────────
 
+    
     def _load_history(self):
         stored = load_history(self.agent_name)
         self.messages = []
+
         for msg in stored:
             content = msg.get("content", "")
-            role    = msg.get("role", "user")
+            role = msg.get("role", "user")
             is_user = role == "user"
-            if isinstance(content, str):
-                file_chips, clean_text, img_atts = _extract_file_markers(content)
-                if file_chips or img_atts:
-                    self._add_message(
-                        clean_text, is_user=is_user,
-                        file_chips=file_chips,
-                        attachments=img_atts if img_atts else None,
-                    )
-                else:
-                    self._add_message(content, is_user=is_user)
-            self.messages.append(msg)
+
+            if not isinstance(content, str):
+                self.messages.append(msg)
+                continue
+
+            file_chips, clean_text, img_atts = _extract_file_markers(content)
+
+            display_text = clean_text if file_chips or img_atts else content
+
+            widget = self._add_message(
+                display_text,
+                is_user=is_user,
+                file_chips=file_chips or None,
+                attachments=img_atts or None,
+            )
+
+            if not is_user:
+                chips = _matching_artifact_chips(content, self.agent_name)
+                artifact_filenames = {fname for _, fname, _ in chips}
+
+                if artifact_filenames:
+                    widget.finalize_display(artifact_filenames, chips)
+
+                self.messages.append(msg)
+
 
     def _save_history(self):
         saveable = []
@@ -1486,6 +1565,7 @@ class ChatPanel(QWidget):
         w.artifact_open_requested.connect(self.artifact_open_requested)
         self.msg_layout.insertWidget(self.msg_layout.count() - 1, w)
         self._scroll_to_bottom()
+        return w
 
     def _scroll_to_bottom(self):
         QTimer.singleShot(50, lambda: self.scroll.verticalScrollBar().setValue(
