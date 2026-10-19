@@ -12,37 +12,22 @@ Version logic:
 - Same filename + same content → no duplicate
 - New filename → v1
 
-Storage format:
-{
-  "agents": {
-    "Coder": {
-      "index.html": {
-        "type": "code",
-        "language": "html",
-        "created": "ISO timestamp",
-        "versions": [
-          {"v": 1, "content": "...", "timestamp": "ISO"},
-          {"v": 2, "content": "...", "timestamp": "ISO"},
-          {"v": 3, "content": "...", "timestamp": "ISO"}
-        ],
-        "current_version": 3
-      }
-    }
-  }
-}
 """
+
 from __future__ import annotations
+
+import hashlib
 import json
 import re
-import hashlib
-from pathlib import Path
+import shutil
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
-from core.paths import CONFIG_DIR, atomic_write_text
-ARTIFACTS_FILE = CONFIG_DIR / "artifacts.json"
+from core.paths import ARTIFACTS_DIR, atomic_write_text
 
 MAX_VERSIONS = 3
+
 
 # Language → extension map
 LANG_TO_EXT: dict[str, str] = {
@@ -103,73 +88,191 @@ KNOWN_FILENAMES = re.compile(
 )
 
 
+
 class ArtifactManager:
     """
-    Manages artifacts for all agents.
-    Singleton — one instance per app session.
+    Filesystem-backed artifact manager.
+
+    Storage:
+        Artifacts/
+            AgentName/
+                ArtifactName/
+                    metadata.json
+                    v1.py
+                    v2.py
+
+    Public metadata retains the previous shape so existing consumers
+    can continue reading versions and their content.
     """
+
     _instance = None
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._instance._data = cls._instance._load()
+            cls._instance._data = {"agents": {}}
+            cls._instance.reload()
         return cls._instance
 
-    # ── Persistence ────────────────────────────────────────────────────────
+    # ── Safe paths ─────────────────────────────────────────────────────
+
+    @staticmethod
+    def _safe_component(value: str) -> str:
+        """Turn a user/model-provided name into one safe path component."""
+        value = str(value).strip()
+        value = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", value)
+        value = value.strip(" .")
+        return value or "Untitled"
+
+    def _agent_dir(self, agent_name: str) -> Path:
+        return ARTIFACTS_DIR / self._safe_component(agent_name)
+
+    def _artifact_dir(self, agent_name: str, filename: str) -> Path:
+        # Use the filename stem for the directory; the extension belongs
+        # to each version file. This keeps paths readable.
+        safe_name = Path(self._safe_component(filename)).name
+        stem = Path(safe_name).stem or "artifact"
+        return self._agent_dir(agent_name) / stem
+
+    @staticmethod
+    def _metadata_path(artifact_dir: Path) -> Path:
+        return artifact_dir / "metadata.json"
+
+    @staticmethod
+    def _version_path(artifact_dir: Path, version: int, extension: str) -> Path:
+        extension = re.sub(r"[^A-Za-z0-9_-]", "", extension) or "txt"
+        return artifact_dir / f"v{version}.{extension}"
+
+    # ── Persistence and indexing ───────────────────────────────────────
 
     def _load(self) -> dict:
-        if ARTIFACTS_FILE.exists():
-            try:
-                return json.loads(ARTIFACTS_FILE.read_text(encoding="utf-8"))
-            except Exception:
-                return {"agents": {}}
-        return {"agents": {}}
+        data = {"agents": {}}
 
-    def _save(self):
-        CONFIG_DIR.mkdir(exist_ok=True)
+        if not ARTIFACTS_DIR.exists():
+            return data
+
+        for agent_dir in ARTIFACTS_DIR.iterdir():
+            if not agent_dir.is_dir():
+                continue
+
+            agent_name = agent_dir.name
+            data["agents"][agent_name] = {}
+
+            for artifact_dir in agent_dir.iterdir():
+                if not artifact_dir.is_dir():
+                    continue
+
+                metadata_path = self._metadata_path(artifact_dir)
+                try:
+                    metadata = json.loads(
+                        metadata_path.read_text(encoding="utf-8")
+                    )
+                except (OSError, json.JSONDecodeError):
+                    continue
+
+                filename = metadata.get("filename")
+                if not filename:
+                    continue
+
+                extension = metadata.get("extension", "txt")
+                versions = []
+
+                for version_info in metadata.get("versions", []):
+                    version_number = version_info.get("v")
+                    if not isinstance(version_number, int):
+                        continue
+
+                    version_path = self._version_path(
+                        artifact_dir, version_number, extension
+                    )
+                    try:
+                        content = version_path.read_text(encoding="utf-8")
+                    except OSError:
+                        # Do not expose metadata for a version whose file
+                        # is missing or unreadable.
+                        continue
+
+                    versions.append({
+                        "v": version_number,
+                        "content": content,
+                        "timestamp": version_info.get("timestamp", ""),
+                    })
+
+                if not versions:
+                    continue
+
+                current_version = metadata.get("current_version")
+                available = {item["v"] for item in versions}
+                if current_version not in available:
+                    current_version = max(available)
+
+                data["agents"][agent_name][filename] = {
+                    "type": metadata.get("type", "code"),
+                    "language": metadata.get("language", ""),
+                    "created": metadata.get("created", ""),
+                    "versions": sorted(versions, key=lambda item: item["v"]),
+                    "current_version": current_version,
+                    "_artifact_dir": str(artifact_dir),
+                    "_extension": extension,
+                }
+
+        return data
+
+    def _save_metadata(self, agent_name: str, filename: str) -> None:
+        artifact = self._data["agents"][agent_name][filename]
+        artifact_dir = Path(artifact["_artifact_dir"])
+
+        metadata = {
+            "filename": filename,
+            "type": artifact.get("type", "code"),
+            "language": artifact.get("language", ""),
+            "extension": artifact.get("_extension", "txt"),
+            "created": artifact.get("created", ""),
+            "current_version": artifact["current_version"],
+            "versions": [
+                {"v": item["v"], "timestamp": item["timestamp"]}
+                for item in artifact["versions"]
+            ],
+        }
+
         atomic_write_text(
-            ARTIFACTS_FILE,
-            json.dumps(
-                self._data,
-                indent=2,
-                ensure_ascii=False,
-            ),
+            self._metadata_path(artifact_dir),
+            json.dumps(metadata, indent=2, ensure_ascii=False),
         )
 
     def reload(self):
-        """Reload from disk (called after external edits)."""
+        """Reload artifact metadata and version contents from disk."""
         self._data = self._load()
 
-    # ── Core artifact operations ───────────────────────────────────────────
+    # ── Core artifact operations ───────────────────────────────────────
 
     def get_agent_artifacts(self, agent_name: str) -> dict:
-        """Return all artifacts for an agent. Keys are filenames."""
         return self._data["agents"].get(agent_name, {})
 
     def get_artifact(self, agent_name: str, filename: str) -> Optional[dict]:
-        """Get a single artifact dict."""
         return self._data["agents"].get(agent_name, {}).get(filename)
 
     def get_current_content(self, agent_name: str, filename: str) -> str:
-        """Get the current version's content."""
         artifact = self.get_artifact(agent_name, filename)
         if not artifact:
             return ""
-        v = artifact["current_version"]
-        for ver in artifact["versions"]:
-            if ver["v"] == v:
-                return ver["content"]
+
+        current = artifact["current_version"]
+        for version in artifact["versions"]:
+            if version["v"] == current:
+                return version["content"]
         return ""
 
-    def get_version_content(self, agent_name: str, filename: str, version: int) -> str:
-        """Get content of a specific version."""
+    def get_version_content(
+        self, agent_name: str, filename: str, version: int
+    ) -> str:
         artifact = self.get_artifact(agent_name, filename)
         if not artifact:
             return ""
-        for ver in artifact["versions"]:
-            if ver["v"] == version:
-                return ver["content"]
+
+        for item in artifact["versions"]:
+            if item["v"] == version:
+                return item["content"]
         return ""
 
     def save_artifact(
@@ -180,105 +283,151 @@ class ArtifactManager:
         language: str,
     ) -> tuple[bool, int]:
         """
-        Save or update an artifact.
+        Save an artifact or create a new version.
+
         Returns (is_new_version, version_number).
-
-        Rules:
-        - New filename → create v1
-        - Same filename, same content → no change, return current version
-        - Same filename, different content → new version (keep last 3)
+        Identical content does not create a duplicate version.
+        Only the latest MAX_VERSIONS are retained.
         """
-        if "agents" not in self._data:
-            self._data["agents"] = {}
-        if agent_name not in self._data["agents"]:
-            self._data["agents"][agent_name] = {}
+        agent_name = self._safe_component(agent_name)
+        filename = Path(self._safe_component(filename)).name
+        language = (language or "").strip().lower()
 
-        agent_artifacts = self._data["agents"][agent_name]
-        now = datetime.now().isoformat()
+        if not filename:
+            raise ValueError("Artifact filename cannot be empty.")
 
-        if filename not in agent_artifacts:
-            # New artifact — v1
-            agent_artifacts[filename] = {
-                "type": "code",
-                "language": language,
-                "created": now,
-                "versions": [
-                    {"v": 1, "content": content, "timestamp": now}
-                ],
-                "current_version": 1,
-            }
-            self._save()
-            return True, 1
+        agent_artifacts = self._data["agents"].setdefault(agent_name, {})
+        now = datetime.now().astimezone().isoformat()
 
-        # Existing artifact
-        artifact = agent_artifacts[filename]
-        current_v = artifact["current_version"]
-        current_content = self.get_current_content(agent_name, filename)
+        artifact = agent_artifacts.get(filename)
 
-        # Content hash comparison
-        if _hash(content) == _hash(current_content):
-            return False, current_v  # No change
+        if artifact:
+            current_version = artifact["current_version"]
+            current_content = self.get_current_content(agent_name, filename)
 
-        # New version
-        new_v = current_v + 1
-        artifact["versions"].append(
-            {"v": new_v, "content": content, "timestamp": now}
-        )
-        # Keep only last MAX_VERSIONS
-        if len(artifact["versions"]) > MAX_VERSIONS:
-            artifact["versions"] = artifact["versions"][-MAX_VERSIONS:]
+            if _hash(content) == _hash(current_content):
+                return False, current_version
 
-        artifact["current_version"] = new_v
-        artifact["language"] = language  # Update language if changed
+            new_version = current_version + 1
+            artifact_dir = Path(artifact["_artifact_dir"])
+            extension = artifact["_extension"]
 
-        self._save()
-        return True, new_v
+            version_path = self._version_path(
+                artifact_dir, new_version, extension
+            )
+            atomic_write_text(version_path, content)
+
+            artifact["versions"].append({
+                "v": new_version,
+                "content": content,
+                "timestamp": now,
+            })
+
+            # Remove old version files and metadata entries.
+            artifact["versions"] = sorted(
+                artifact["versions"], key=lambda item: item["v"]
+            )
+            while len(artifact["versions"]) > MAX_VERSIONS:
+                oldest = artifact["versions"].pop(0)
+                old_path = self._version_path(
+                    artifact_dir, oldest["v"], extension
+                )
+                try:
+                    old_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+
+            artifact["current_version"] = new_version
+            artifact["language"] = language
+            self._save_metadata(agent_name, filename)
+            return True, new_version
+
+        # Create a new artifact directory.
+        artifact_dir = self._artifact_dir(agent_name, filename)
+
+        # Avoid silently reusing a directory if two names collapse to
+        # the same sanitized path.
+        if artifact_dir.exists():
+            base = artifact_dir.name
+            suffix = hashlib.sha256(filename.encode("utf-8")).hexdigest()[:8]
+            artifact_dir = artifact_dir.with_name(f"{base}-{suffix}")
+
+        extension = Path(filename).suffix.lstrip(".")
+        if not extension:
+            extension = LANG_TO_EXT.get(language, "txt")
+            filename = f"{filename}.{extension}"
+            artifact_dir = self._artifact_dir(agent_name, filename)
+
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+
+        version_path = self._version_path(artifact_dir, 1, extension)
+        atomic_write_text(version_path, content)
+
+        agent_artifacts[filename] = {
+            "type": "code",
+            "language": language,
+            "created": now,
+            "versions": [{
+                "v": 1,
+                "content": content,
+                "timestamp": now,
+            }],
+            "current_version": 1,
+            "_artifact_dir": str(artifact_dir),
+            "_extension": extension,
+        }
+
+        self._save_metadata(agent_name, filename)
+        return True, 1
 
     def delete_agent_artifacts(self, agent_name: str):
-        """Delete ALL artifacts for an agent. Called on Fire."""
-        if "agents" in self._data and agent_name in self._data["agents"]:
-            del self._data["agents"][agent_name]
-            self._save()
+        """Delete every artifact belonging to an agent."""
+        agent_key = self._safe_component(agent_name)
+        agent_dir = self._agent_dir(agent_key)
+
+        if agent_dir.exists():
+            shutil.rmtree(agent_dir)
+
+        self._data["agents"].pop(agent_key, None)
 
     def clear_agent_artifacts(self, agent_name: str):
-        """Clear artifacts for an agent. Called on Clear Chat."""
-        if "agents" in self._data and agent_name in self._data["agents"]:
-            self._data["agents"][agent_name] = {}
-            self._save()
+        """Delete all artifacts for an agent when its chat is cleared."""
+        self.delete_agent_artifacts(agent_name)
 
     def artifact_count(self, agent_name: str) -> int:
-        return len(self._data["agents"].get(agent_name, {}))
+        return len(self.get_agent_artifacts(agent_name))
 
     def all_agents_with_artifacts(self) -> list[str]:
-        return list(self._data.get("agents", {}).keys())
+        return [
+            name for name, artifacts in self._data["agents"].items()
+            if artifacts
+        ]
 
-    # ── Code block parsing ─────────────────────────────────────────────────
+    # ── Code block parsing ─────────────────────────────────────────────
 
     def parse_and_save_artifacts(
         self,
         agent_name: str,
         response_text: str,
     ) -> list[tuple[str, int]]:
-        """
-        Parse a complete agent response for code blocks.
-        Saves each detected artifact.
-        Returns list of (filename, version) for each artifact found.
-        """
+        """Save detected code artifacts and return (filename, version)."""
         results = []
-        blocks = _extract_code_blocks(response_text)
 
-        for language, code_content, context_before in blocks:
+        for language, code_content, context_before in _extract_code_blocks(
+            response_text
+        ):
             if not code_content.strip():
                 continue
 
-            filename = _infer_filename(language, code_content, context_before)
+            filename = _infer_filename(
+                language, code_content, context_before
+            )
             if not filename:
                 continue
 
-            ext = LANG_TO_EXT.get(language.lower(), language.lower() or "txt")
-            # Ensure filename has correct extension
             if "." not in filename:
-                filename = f"{filename}.{ext}"
+                extension = LANG_TO_EXT.get(language.lower(), "txt")
+                filename = f"{filename}.{extension}"
 
             is_new, version = self.save_artifact(
                 agent_name, filename, code_content, language.lower()

@@ -95,10 +95,13 @@ def _default_data_dir() -> Path:
 
 DATA_DIR = _default_data_dir()
 
+
 # Persistent user directories.
 CONFIG_DIR = DATA_DIR / "config"
 BUCKET_DIR = DATA_DIR / "bucket"
 WORKSPACE_DIR = DATA_DIR / "workspace"
+ARTIFACTS_DIR = DATA_DIR / "Artifacts"
+
 
 HISTORY_DIR = WORKSPACE_DIR / "history"
 MEMORY_DIR = WORKSPACE_DIR / "memory"
@@ -134,6 +137,7 @@ def initialize_data_directory() -> None:
         HISTORY_DIR,
         MEMORY_DIR,
         IMAGES_DIR,
+        ARTIFACTS_DIR
     ):
         directory.mkdir(parents=True, exist_ok=True)
 
