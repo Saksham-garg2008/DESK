@@ -40,6 +40,7 @@ from ui.widgets.inline_code_block import InlineCodeBlock as ScrollableInlineCode
 from core.Prompts.agentic_actions import get_agentic_actions_prompt #Agentic System Prompt
 from core.Prompts.desk_identity import get_desk_identity_prompt #Desk Identity System Prompt
 from core.Prompts.configuration import get_configuration_prompt #Desk Configuration System Prompt
+from core.Prompts.artifacts import get_artifacts_prompt #Artifact and Output formats System Prompt
 
 SUPPORTED_IMAGES = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 SUPPORTED_DOCS   = {".pdf", ".txt", ".md", ".csv", ".json", ".py",
@@ -1187,6 +1188,7 @@ class ChatPanel(QWidget):
             f"{system_prompt}\n\n"
             f"{get_desk_identity_prompt()}\n\n"
             f"{get_configuration_prompt()}\n\n"
+            f"{get_artifacts_prompt()}\n\n"
             f"{get_agentic_actions_prompt()}"
         ).strip()
             
