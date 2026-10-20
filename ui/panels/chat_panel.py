@@ -42,6 +42,7 @@ from core.Prompts.desk_identity import get_desk_identity_prompt #Desk Identity S
 from core.Prompts.configuration import get_configuration_prompt #Desk Configuration System Prompt
 from core.Prompts.artifacts import get_artifacts_prompt #Artifact and Output formats System Prompt
 from core.Prompts.memory import get_memory_prompt #Memory usage system prompt
+from core.Prompts.keyboard_shortcuts import get_keyboard_shortcuts_prompt #Keyboard Shortcuts System Prompt
 
 SUPPORTED_IMAGES = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 SUPPORTED_DOCS   = {".pdf", ".txt", ".md", ".csv", ".json", ".py",
@@ -1191,6 +1192,7 @@ class ChatPanel(QWidget):
             f"{get_configuration_prompt()}\n\n"
             f"{get_memory_prompt()}\n\n"
             f"{get_artifacts_prompt()}\n\n"
+            f"{get_keyboard_shortcuts_prompt()}\n\n"
             f"{get_agentic_actions_prompt()}"
         ).strip()
             

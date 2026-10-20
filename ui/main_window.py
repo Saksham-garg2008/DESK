@@ -48,6 +48,7 @@ class AgentStrip(QPushButton):
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self._active = False
         self._apply_style()
+        self._memory_return_agent = None
 
     def update_color(self, color: str):
         self.agent_color = color
@@ -747,6 +748,7 @@ class MainWindow(QMainWindow):
         top, agent list + editable memory content below. Reached directly
         via the 🧠 pole icon, same pattern as Settings/Keys.
         """
+        self._memory_return_agent = self._active_agent
         if self._active_agent and self._active_agent in self._agent_panels:
             self._agent_panels[self._active_agent].flush_memory()
         self.memory_panel.refresh()
@@ -794,19 +796,41 @@ class MainWindow(QMainWindow):
 
     # ── Shortcuts ──────────────────────────────────────────────────────────
 
+    
     def _setup_shortcuts(self):
-        QShortcut(QKeySequence("Ctrl+N"), self).activated.connect(
+    # Navigation and panels
+        QShortcut(QKeySequence("Alt+N"), self).activated.connect(
             self._open_new_agent_dialog
         )
+        QShortcut(QKeySequence("Alt+W"), self).activated.connect(
+            self._toggle_workspace
+        )
+        QShortcut(QKeySequence("Alt+S"), self).activated.connect(
+            self._show_settings
+        )
+        QShortcut(QKeySequence("Alt+K"), self).activated.connect(
+            self._show_keys
+        )
+        QShortcut(QKeySequence("Alt+M"), self).activated.connect(
+            self._toggle_memory_panel
+        )
+
+        # Agent switching
         QShortcut(QKeySequence("Shift+Tab"), self).activated.connect(
             self._cycle_agents
         )
-        QShortcut(QKeySequence("Ctrl+,"), self).activated.connect(
-            self._show_settings
+        QShortcut(QKeySequence("Alt+H"), self).activated.connect(
+            self._go_home_agent
         )
-        QShortcut(QKeySequence("Ctrl+W"), self).activated.connect(
-            self._toggle_workspace
+
+        # Compute mode and destructive action
+        QShortcut(QKeySequence("Alt+Right"), self).activated.connect(
+            self._toggle_compute_mode
         )
+        QShortcut(QKeySequence("Alt+D"), self).activated.connect(
+            self._fire_active_agent
+        )
+
 
     def _cycle_agents(self):
         names = list(self._agent_strips.keys())
@@ -817,6 +841,28 @@ class MainWindow(QMainWindow):
             return
         idx = names.index(self._active_agent)
         self._activate_agent(names[(idx + 1) % len(names)])
+        
+    def _toggle_memory_panel(self):
+        if self.stack.currentWidget() is self.memory_panel:
+			# Return to the previously active agent when possible.
+            if (
+                self._memory_return_agent
+                and self._memory_return_agent in self._agent_panels
+            ):
+                self._activate_agent(self._memory_return_agent)
+            elif self._agent_strips:
+                self._activate_agent(next(iter(self._agent_strips)))
+            else:
+                self.stack.setCurrentWidget(self.welcome)
+            return
+
+        self._show_memory_panel()
+
+
+    def _go_home_agent(self):
+        names = list(self._agent_strips.keys())
+        if names:
+            self._activate_agent(names[0])
 
     # ── Stylesheet & Geometry ──────────────────────────────────────────────
 
