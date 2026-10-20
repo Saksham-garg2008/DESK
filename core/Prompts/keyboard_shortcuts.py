@@ -20,6 +20,7 @@ WINDOWS AND LINUX
   restores the previously active agent; otherwise, DESK falls back to the
   first available agent or the welcome screen.
 - Alt + H: Activate the first agent in the current sidebar order.
+- Ctrl + Shift + P: Open the QR-code generator for connecting DESK with the Android Companion.
 
 MACOS
 The macOS equivalents below are expected mappings, not independently

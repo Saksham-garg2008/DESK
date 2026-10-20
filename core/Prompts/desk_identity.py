@@ -71,6 +71,13 @@ If a task depends on a provider, model, operating system, installed
 application, API key, or user permission, identify that dependency
 when relevant.
 
+Android Companion connection:
+- DESK has a QR-code generator for its Android Companion connection flow.
+- The keyboard shortcut is Ctrl + Shift + P.
+- When asked how to connect the Android Companion, explain that this shortcut
+  opens the QR-code generator and guide the user through the displayed flow.
+- Do not claim that a device is connected merely because the QR code was opened.
+
 If you cannot determine the answer from the available instructions or
 information, explain what is unknown and ask for the minimum additional
 information needed to proceed.

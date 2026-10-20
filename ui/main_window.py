@@ -36,7 +36,7 @@ from core.config_loader import (
 )
 
 from core.paths import BUCKET_DIR, RESOURCE_STYLES_DIR
-
+from ui.panels.how_to_manual_panel import HowToManualPanel #How To Manual Import
 
 class AgentStrip(QPushButton):
     def __init__(self, name: str, color: str, parent=None):
@@ -161,6 +161,7 @@ class MainWindow(QMainWindow):
         self._agent_panels: dict[str, ChatPanel] = {}
         self._active_agent: str | None = None
         self._workspace_visible = False
+        self._manual_return_agent = None
 
         self._build_ui()
         self._load_stylesheet()
@@ -246,6 +247,9 @@ class MainWindow(QMainWindow):
 
         self.memory_panel = MemoryPanel()
         self.stack.addWidget(self.memory_panel)
+        
+        self.how_to_manual_panel = HowToManualPanel()
+        self.stack.addWidget(self.how_to_manual_panel)
 
         self.content_splitter.addWidget(self.stack, 1)
 
@@ -361,6 +365,28 @@ class MainWindow(QMainWindow):
         """)
         self.compute_pill.clicked.connect(self._toggle_compute_mode)
         layout.addWidget(self.compute_pill)
+        
+        # ── How To Manual button ─────────────────────────────────────
+        self.manual_btn = QPushButton("💡")
+        self.manual_btn.setObjectName("manual_btn")
+        self.manual_btn.setToolTip("How To Manual — learn how to use DESK")
+        self.manual_btn.setCursor(Qt.PointingHandCursor)
+        self.manual_btn.setFixedSize(36, 32)
+        self.manual_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                border: 1px solid #252530;
+                border-radius: 6px;
+                font-size: 17px;
+                color: #C5B987;
+            }
+            QPushButton:hover {
+                background: #24231F;
+                border-color: #514B35;
+            }
+        """)
+        self.manual_btn.clicked.connect(self._toggle_how_to_manual)
+        layout.addWidget(self.manual_btn)
 
         # ── Workspace button ─────────────────────────────────────────
         self.workspace_btn = QPushButton("Workspace")
@@ -760,6 +786,47 @@ class MainWindow(QMainWindow):
         self.topbar_title.setText("MEMORY")
 
     # ── Memory Agent config lives inside the Memory panel itself now ──────
+    
+    # HOW TO MANUAL PANEL
+    def _show_how_to_manual(self):
+        """Open the full-width offline user manual."""
+        if self.stack.currentWidget() is self.how_to_manual_panel:
+            return
+
+        self._manual_return_agent = self._active_agent
+
+        if self._active_agent and self._active_agent in self._agent_panels:
+            self._agent_panels[self._active_agent].flush_memory()
+
+        if self._active_agent and self._active_agent in self._agent_strips:
+            self._agent_strips[self._active_agent].set_active(False)
+
+        self._active_agent = None
+        self.fire_btn.setVisible(False)
+
+        self.stack.setCurrentWidget(self.how_to_manual_panel)
+        self.topbar_title.setText("HOW TO MANUAL")
+
+
+    def _toggle_how_to_manual(self):
+        """Toggle the manual and return to the previous agent when possible."""
+        if self.stack.currentWidget() is not self.how_to_manual_panel:
+            self._show_how_to_manual()
+            return
+
+        if (
+            self._manual_return_agent
+            and self._manual_return_agent in self._agent_panels
+        ):
+            self._activate_agent(self._manual_return_agent)
+        elif self._agent_strips:
+            self._activate_agent(next(iter(self._agent_strips)))
+        else:
+            self.stack.setCurrentWidget(self.welcome)
+            self.topbar_title.setText("DESK")
+            self.fire_btn.setVisible(False)
+
+        self._manual_return_agent = None
 
     # ── Compute Mode ───────────────────────────────────────────────────────
 
